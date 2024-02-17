@@ -1,0 +1,53 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set Version
+        id: set-version
+        run:
+          echo "version=`egrep -o "version>(.*)</version" install.xml | egrep -o \"[0-9.]*\"`" >> $GITHUB_OUTPUT
+
+      - name: Zip Repository
+        id: zip
+        run: zip Deezer -r API *.pm HTML Settings install.xml strings.txt README.md
+
+      - name: Setup Perl
+        run: |
+          sudo apt-get install -y libxml-simple-perl libdigest-sha-perl
+
+      - name: Update SHA and Version in repo.xml
+        id: tag
+        run: |
+          url="https://github.com/${{ github.repository }}/releases/download/${{ steps.set-version.outputs.version }}"
+          perl repo/release.pl repo/repo.xml ${{ steps.set-version.outputs.version }} Deezer.zip $url
+
+      - name: Update Repository
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add repo/repo.xml
+          git commit -m "Update repo.xml for release ${{ steps.set-version.outputs.version }}"
+          git push origin HEAD:main
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.set-version.outputs.version }}
+          name: Version ${{ steps.set-version.outputs.version }}
+          body: Deezer plugin release
+          draft: false
+          prerelease: false
+          files: Deezer.zip
+

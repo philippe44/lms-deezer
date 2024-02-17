@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OAuth redirection</title>
+    <script>
+        function followLink() {
+            // Get the parameters from the URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            var args = urlParams.get('args');
+            const seed = urlParams.get('seed');
+            
+            // Construct the new URL with the code parameter
+            const newUrl = `http://${args}/plugins/deezer/auth?seed=${seed}&code=${code}`;
+            console.log(`redirect to ${newUrl}`);
+
+            // Redirect to the new URL
+            window.location.href = newUrl;
+        }
+    </script>
+</head>
+<body>
+    <p><a href="#" onclick="followLink()">click here to validate and return to LMS</a></p>
+</body>
+</html>
