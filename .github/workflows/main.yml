@@ -18,7 +18,7 @@ jobs:
 
       - name: Zip Repository
         id: zip
-        run: zip Deezer -r API *.pm HTML Settings install.xml strings.txt README.md
+        run: zip Deezer -r API *.pm HTML Settings lib install.xml strings.txt README.md
 
       - name: Setup Perl
         run: |
