@@ -1,14 +1,14 @@
 <?xml version='1.0' standalone='yes'?>
 <extensions>
   <plugins>
-    <plugin name="TIDAL" version="0.1.0" maxTarget="*" minTarget="8.3">
-      <sha>bbcae7e681f1b7ae4559c98e9db923245829acc3</sha>
+    <plugin version="0.1.0" maxTarget="*" name="TIDAL" minTarget="8.3">
+      <sha>370431c58a5fc15f23143d91f4c90a5fd59ae42e</sha>
       <title lang="EN">Deezer local</title>
       <desc lang="EN">Deezer for local LMS use</desc>
-      <category>musicservices</category>
-      <url>https://github.com/philippe_44/lms-deezer/releases/download/0.1.0/Deezer.zip</url>
-      <link>https://github.com/philippe_44/lms-deezer</link>
       <creator>philippe_44, Michael Herger</creator>
+      <url>https://github.com/philippe44/lms-deezer/releases/download/0.1.0/Deezer.zip</url>
+      <link>https://github.com/philippe_44/lms-deezer</link>
+      <category>musicservices</category>
     </plugin>
   </plugins>
 </extensions>
