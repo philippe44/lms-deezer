@@ -1,0 +1,197 @@
+PLUGIN_DEEZER_NAME
+	EN	Deezer
+
+PLUGIN_DEEZER_DESC
+	DE	Deezer Plugin zur Integration mit LMS, ohne Verbindung zu MySqueezebox.com.
+	EN	Deezer Plugin for LMS, does not depend on MySqueezebox.com.
+	
+PLUGIN_DEEZER_REGISTER
+	EN	Click "Add Account" to open a Deezer login page and allow the plugin to access
+	EN	your account. The ARL token is required and you can use Google, YouTube or Reddit
+	EN	to figure out of to get it. <br>PLEASE NOTE THAT ONLY PREMIUM ACCOUNT CAN BE USED
+	FR	Cliquer sur "Ajouter un compte" pour se connecter à Deezer et en accepter l'utilisation
+	FR	par le plugin. The jeton ARL est nécessaire, utilisez Googel, YouTube ou Reddit pour 
+	FR	savoir comment l'obtenir. <br>SEULS LES COMPTES PREMIMUMS SONT UTILISABLES.
+
+PLUGIN_DEEZER_ADD_ACCOUNT
+	CS	Přidat účet
+	DA	Tilføj konto
+	DE	Konto hinzufügen
+	EN	Add Account
+	FR	Ajouter un compte
+	IT	Aggiungi Account
+	NL	Account toevoegen
+
+PLUGIN_DEEZER_AUTH
+	CS	Autorizace Deezer
+	DA	Autoriser Deezer
+	DE	Deezer Anmeldung
+	EN	Deezer Authorization
+	FR	Autorisation Deezer
+	NL	Deezer Autorisatie
+	IT	Autorizza Deezer
+
+PLUGIN_DEEZER_IMPORT_LIBRARY
+	CS	Importovat
+	DA	Importer
+	DE	Importieren
+	EN	Import
+	FR	Importer
+	IT	Import
+	NL	Importeren
+
+PLUGIN_DEEZER_ACCOUNT
+	CS	Účet
+	DA	Konto
+	DE	Konto
+	EN	Account
+	ES	Cuenta
+	FI	Tili
+	FR	Compte
+	IT	Account
+	NL	Account
+	NO	Konto
+	PL	Konto
+	RU	Учетная запись
+	SV	Konto
+
+PLUGIN_DEEZER_FOLLOW_LINK
+	DA	Det efterfølgende link tager dig til Deezer for at autorisere. Her skal du give Logitech Media Server adgang til din Deezer konto. Efter du er logget på, så kom tilbage hertil:
+	DE	Der folgende Link führt Sie zu Deezer zur Authentifizierung. Bitte folgen Sie ihm, um dem Logitech Media Server Zugriff auf Ihr Deezer-Konto zu gewähren. Sobald Sie die Anmeldung abgeschlossen haben, kommen Sie hierher zurück:
+	EN	The following link takes you to Deezer for authentication. Please follow it grant Logitech Media Server access to your Deezer account. Once you've completed sign-in come back here:
+	FR	Le lien suivant vous mènera à Deezer pour authentification. Veuillez le suivre pour accorder à Logitech Media Server l'accès à votre compte Deezer. Une fois votre inscription terminée, revenez ici :
+	IT	Il seguente link reindirizza all'autenticazione di Deezer. Per favore, garantisci l'accesso al tuo account Deezer a Logitech Media Server e torna in questa pagina una volta completato il login.
+
+PLUGIN_DEEZER_REQUIRES_CREDENTIALS
+	DA	Gå til Settings/advanced/Deezer for at autorisere med Deezer
+	DE	Bitte melden Sie sich in den Server-Einstellungen unter Erweitert/Deezer an Deezer an.
+	EN	Please go to Settings/Advanced/Deezer to authenticate with Deezer.
+	FR	Veuillez vous connecter à Deezer en accédant aux réglages du plugin Deezer (paramètres/avancé/Deezer ou préférences/serveur/Deezer).
+	IT	Per autenticarti con Deezer, vai a Impostazioni/Avanzate/Deezer
+
+PLUGIN_DEEZER_SELECT_ACCOUNT
+	CS	Zvolení účtu
+	DA	Vælg konto
+	DE	Konto auswählen
+	EN	Select Account
+	ES	Seleccionar cuenta
+	FI	Valitse tili
+	FR	Sélectionner le compte
+	IT	Seleziona account
+	NL	Account selecteren
+	NO	Velg konto
+	PL	Wybierz konto w usłudze
+	RU	Выберите учетную запись
+	SV	Välj konto
+
+PLUGIN_DEEZER_QUALITY
+	DA	Kvalitet
+	DE	Qualität
+	EN	Quality
+	FR	Qualité
+	IT	Qualità
+
+PLUGIN_DEEZER_QUALITY_DESC
+	DA	Streaming kvalitet
+	DE	Stream Qualität
+	EN	Streaming quality
+	FR	Qualité du streaming
+	IT	Qualità dello streaming
+
+PLUGIN_DEEZER_MOODS
+	DA	Stemninger
+	DE	Stimmungen
+	EN	Moods
+	FR	Ambiances
+	IT	Moods
+
+PLUGIN_DEEZER_CHART
+	EN	Charts
+
+PLUGIN_DEEZER_ALBUMS_PROGRESS
+	CS	Alba Deezeru
+	DA	Deezer Album
+	DE	Deezer Alben
+	EN	Deezer Albums
+	FR	Albums Deezer
+	IT	Deezer Albums
+	NL	Deezer Albums
+
+PLUGIN_DEEZER_PROGRESS_READ_ALBUMS
+	CS	Načítání alb (%s)...
+	DA	Henter Album (%s)...
+	DE	Lese Alben (%s)...
+	EN	Fetching Albums (%s)...
+	FR	Récupération des albums (%s)...
+	IT	Recupero gli album (%s)...
+	NL	Albums ophalen (%s)...
+
+PLUGIN_DEEZER_ARTISTS_PROGRESS
+	CS	Interpeti Deezeru
+	DA	Deezer Artister
+	DE	Deezer Interpreten
+	EN	Deezer Artists
+	FR	Artistes Deezer
+	IT	Deezer Artist
+	NL	Deezer Artiesten
+
+PLUGIN_DEEZER_PROGRESS_READ_ARTISTS
+	CS	Načítání interpetů (%s)...
+	DA	Henter Artister (%s)...
+	DE	Lese Interpreten (%s)...
+	EN	Fetching Artists (%s)...
+	FR	Récupération des artistes (%s)...
+	IT	Recupero gli artisti (%s)...
+	NL	Artiesten ophalen (%s)...
+
+PLUGIN_DEEZER_PLAYLISTS_PROGRESS
+	CS	Seznamy skladeb Deezeru
+	DA	Deezer Afspilningslister
+	DE	Deezer Wiedergabelisten
+	EN	Deezer Playlists
+	FR	Listes de lecture Deezer
+	IT	Deezer Playlists
+	NL	Deezer Afspeellijsten
+
+PLUGIN_DEEZER_PROGRESS_READ_PLAYLISTS
+	CS	Získávání seznamů skladeb (%s)...
+	DA	Henter Afspilningslister (%s)...
+	DE	Lese Wiedergabelisten (%s)...
+	EN	Fetching Playlists (%s)...
+	FR	Récupération des listes de lecture (%s)...
+	IT	Recupero le playlists (%s)...
+	NL	Afspeellijsten ophalen (%s)...
+
+PLUGIN_DEEZER_TOP_TRACKS
+	CS	Nejlepší skladby
+	DA	Mest populære numre
+	DE	Top-Titel
+	EN	Top Tracks
+	ES	Pistas principales
+	FI	Suositut kappaleet
+	FR	Morceaux les plus écoutés
+	IT	Brani più ascoltati
+	NL	Topnummers
+	NO	Mest populære spor
+	PL	Najczęściej słuchane
+	RU	Лучшие дорожки
+	SV	Toppspår	
+	
+PLUGIN_DEEZER_ARL_TOKEN
+	EN	ARL token
+	FR	Jeton ARL
+	
+PLUGIN_DEEZER_RELATED
+	EN	Related
+	FR	Reliés
+	
+PLUGIN_DEEZER_SMART_RADIO
+	EN	Smart Radio
+	NL	Radio Intelligente
+
+PLUGIN_DEEZER_FLOW
+	EN	Flow
+	
+PLUGIN_DEEZER_ON_DEEZER
+	EN	On Deezer
+	FR	Sur Deezer

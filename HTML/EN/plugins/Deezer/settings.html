@@ -1,0 +1,57 @@
+[% title = "PLUGIN_DEEZER_NAME" %]
+[% PROCESS settings/header.html %]
+	[% IF credentials; WRAPPER setting desc="PLUGIN_DEEZER_REGISTER" %]
+		<table>
+			<tr>
+				<th>[% "PLUGIN_DEEZER_ACCOUNT" | string %][% "COLON" | string %]</th>
+				<th>[% "PLUGIN_DEEZER_IMPORT_LIBRARY"| string %][% "COLON" | string %]</th>
+				<th></th>
+				<th>[% "PLUGIN_DEEZER_ARL_TOKEN" | string %][% "COLON" | string %]</th>				
+			</tr>
+		[% FOREACH creds = credentials %]
+			[% accountName = creds.name; accountId = creds.id %]
+			<tr>
+				<td style="vertical-align: middle; padding-right: 10px">[% accountName | html %]</td>
+				<td style="vertical-align: middle; padding-right: 10px">
+					<select class="stdedit" name="pref_dontimport_[% accountId %]">
+						<option [% IF !dontImportAccounts.$accountId %]selected [% END %]value="0">[% "YES"| string %]</option>
+						<option [% IF dontImportAccounts.$accountId %]selected [% END %]value="1">[% "NO" | string %]</option>
+					</select>
+				</td>
+				<td style="vertical-align: middle">
+					<input name="delete_[% accountId %]" type="submit" value="[% "DELETE" | string %]" class="stdclick" />
+				</td>				
+				<td style="vertical-align: middle">
+					<input type="password" name="pref_arl_[% accountId %]" value="[% creds.arl %]" size="15">
+				</td>
+			</tr>
+			</tr>
+		[% END %]
+		</table>
+	[% END; END %]
+	
+	<script type="text/javascript">
+		function oauthLaunch(link) {
+			console.log("opening link " + link);
+			window.open(link);
+		}
+	</script>
+
+	[% WRAPPER setting title="" desc="" %]
+		<input name="seed" type="hidden" value="[% seed %]" />
+		<input name="addAccount" type="submit" onclick="oauthLaunch('[% authLink %]')" value="[% "PLUGIN_DEEZER_ADD_ACCOUNT" | string %]" class="stdclick" />
+	[% END %]
+
+	[% WRAPPER setting title="PLUGIN_DEEZER_QUALITY" desc="PLUGIN_DEEZER_QUALITY_DESC" %]
+		<!-- <input list="rates" name="pref_quality" id="quality"> -->
+		<!-- <datalist id="rates"> -->
+		<!-- </datalist> -->
+		<!-- </input> -->
+		<select class="stdedit" name="pref_quality" id="quality">		
+		[% FOREACH entry IN [ ['MP3 128Kbps','LOW'], ['MP3 320Kbps', 'HIGH'], ['CD (FLAC)','LOSSLESS'] ] %]
+			<option [% IF entry.1 == prefs.pref_quality %]selected[% END %] value="[% entry.1 %]">[% entry.0 %]</option>
+		[% END %]
+		</select>
+	[% END %]
+
+[% PROCESS settings/footer.html %]

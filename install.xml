@@ -1,0 +1,17 @@
+<?xml version='1.0' standalone='yes'?>
+<extensions>
+  <name>PLUGIN_DEEZER_NAME</name>
+  <description>PLUGIN_DEEZER_DESC</description>
+  <creator>philippe_44, Michael Herger</creator>
+  <id>16da8158-263f-4347-8125-184372ea5611</id>
+  <version>0.1.0</version>
+  <module>Plugins::Deezer::Plugin</module>
+  <!-- <importmodule>Plugins::Deezer::Importer</importmodule> -->
+  <optionsURL>plugins/Deezer/settings.html</optionsURL>
+  <icon>plugins/Deezer/html/deezer.png</icon>
+  <!-- <onlineLibrary>true</onlineLibrary> -->
+  <targetApplication>
+    <minVersion>8.3.0</minVersion>
+    <maxVersion>*</maxVersion>
+  </targetApplication>
+</extensions>
