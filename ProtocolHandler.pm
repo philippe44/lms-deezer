@@ -40,13 +40,13 @@ Slim::Player::ProtocolHandlers->registerURLHandler($URI_REGEX, __PACKAGE__);
 sub init {
 	eval { require Crypt::Blowfish; };
 	if ($@) {
-		$log->warn("Can't use Crypt::Blowfish, will use Crypt:Blowfish_PP");
-		$log->warn("Try to add Crypt::Blowfish to Perl, on Debian do:");
+		$log->warn('Can\'t use Crypt::Blowfish, will use Crypt:Blowfish_PP');
+		$log->warn('Try to add Crypt::Blowfish to Perl, on Debian do:');
 		$log->warn("'sudo apt-get install libcrypt-blowfish-perl'");
 		require Crypt::Blowfish_PP;
 		$cryptoHelper = 'Crypt::Blowfish_PP';
 	} else {
-		$log->info("Using fast Crypt::Blowfish");
+		$log->info('Using fast Crypt::Blowfish');
 		$cryptoHelper = 'Crypt::Blowfish';
 	}
 }	

@@ -53,7 +53,7 @@ sub lookup {
 
 		$class->cb->($track);
 	}, {
-		type => 'tracks',
+		type => 'track',
 		search => $args->{title},
 		limit => 20,
 	});
