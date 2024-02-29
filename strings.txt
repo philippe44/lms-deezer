@@ -4,14 +4,15 @@ PLUGIN_DEEZER_NAME
 PLUGIN_DEEZER_DESC
 	DE	Deezer Plugin zur Integration mit LMS, ohne Verbindung zu MySqueezebox.com.
 	EN	Deezer Plugin for LMS, does not depend on MySqueezebox.com.
+	FR	Plugin Deezer pour LMS (sans lien avec MySqueezebox.com).
 	
 PLUGIN_DEEZER_REGISTER
 	EN	Click "Add Account" to open a Deezer login page and allow the plugin to access
 	EN	your account. The ARL token is required and you can use Google, YouTube or Reddit
 	EN	to figure out of to get it. <br>PLEASE NOTE THAT ONLY PREMIUM ACCOUNT CAN BE USED
 	FR	Cliquer sur "Ajouter un compte" pour se connecter à Deezer et en accepter l'utilisation
-	FR	par le plugin. The jeton ARL est nécessaire, utilisez Googel, YouTube ou Reddit pour 
-	FR	savoir comment l'obtenir. <br>SEULS LES COMPTES PREMIMUMS SONT UTILISABLES.
+	FR	par le plugin. Le jeton ARL est nécessaire. Utilisez Google, YouTube ou Reddit pour 
+	FR	savoir comment l'obtenir. <br>SEULS LES COMPTES PREMIUM SONT UTILISABLES.
 
 PLUGIN_DEEZER_ADD_ACCOUNT
 	CS	Přidat účet
@@ -107,6 +108,7 @@ PLUGIN_DEEZER_MOODS
 
 PLUGIN_DEEZER_CHART
 	EN	Charts
+	FR	Tops
 
 PLUGIN_DEEZER_ALBUMS_PROGRESS
 	CS	Alba Deezeru
@@ -169,7 +171,7 @@ PLUGIN_DEEZER_TOP_TRACKS
 	EN	Top Tracks
 	ES	Pistas principales
 	FI	Suositut kappaleet
-	FR	Morceaux les plus écoutés
+	FR	Top titres
 	IT	Brani più ascoltati
 	NL	Topnummers
 	NO	Mest populære spor
@@ -183,7 +185,7 @@ PLUGIN_DEEZER_ARL_TOKEN
 	
 PLUGIN_DEEZER_RELATED
 	EN	Related
-	FR	Reliés
+	FR	Artistes similaires
 	
 PLUGIN_DEEZER_SMART_RADIO
 	EN	Smart Radio
