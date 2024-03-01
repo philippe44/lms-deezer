@@ -3,7 +3,7 @@
   <plugins>
     <plugin version="2.1.0" minTarget="8.3" maxTarget="*" name="Deezer">
       <url>https://github.com/philippe44/lms-deezer/releases/download/2.1.0/Deezer.zip</url>
-      <link>https://github.com/philippe_44/lms-deezer</link>
+      <link>https://github.com/philippe44/lms-deezer</link>
       <category>musicservices</category>
       <desc lang="EN">Deezer for local LMS use</desc>
       <title lang="EN">Deezer local</title>
