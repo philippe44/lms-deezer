@@ -1,13 +1,8 @@
-package Plugins::TIDAL::Importer;
+package Plugins::Deezer::Importer;
 
 use strict;
 
 use base qw(Slim::Plugin::OnlineLibraryBase);
-
-use Date::Parse qw(str2time);
-use Digest::MD5 qw(md5_hex);
-use JSON::XS::VersionOneAndTwo;
-use List::Util qw(max);
 
 use Slim::Utils::Cache;
 use Slim::Utils::Log;
@@ -15,24 +10,17 @@ use Slim::Utils::Prefs;
 use Slim::Utils::Progress;
 use Slim::Utils::Strings qw(string);
 
-use constant ACCOUNTS_URL  => '/api/wimp/v1/opml/library/getAccounts';
-use constant ALBUMS_URL    => '/api/wimp/v1/opml/library/myAlbums?account=%s';
-use constant ARTISTS_URL   => '/api/wimp/v1/opml/library/myArtists?account=%s';
-use constant ARTIST_URL    => '/api/wimp/v1/opml/library/getArtist?id=%s';
-use constant PLAYLISTS_URL => '/api/wimp/v1/opml/library/myPlaylists?account=%s';
-use constant FINGERPRINT_URL => '/api/wimp/v1/opml/library/fingerprint';
-
 my $cache = Slim::Utils::Cache->new();
-my $log = logger('plugin.tidal');
-my $prefs = preferences('plugin.tidal');
+my $log = logger('plugin.deezer');
+my $prefs = preferences('plugin.deezer');
 
 my ($ct, $splitChar);
 
 sub startScan { if (main::SCANNER) {
 	my ($class) = @_;
 
-	require Plugins::TIDAL::API::Sync;
-	$ct = Plugins::TIDAL::API::getFormat();
+	require Plugins::Deezer::API::Sync;
+	$ct = Plugins::Deezer::API::getFormat();
 	$splitChar = substr(preferences('server')->get('splitList'), 0, 1);
 
 	my $accounts = _enabledAccounts();
@@ -52,7 +40,7 @@ sub startScan { if (main::SCANNER) {
 		}
 
 		$class->deleteRemovedTracks();
-		$cache->set('tidal_library_last_scan', time(), '1y');
+		$cache->set('deezer_library_last_scan', time(), '1y');
 	}
 
 	Slim::Music::Import->endImporter($class);
@@ -63,7 +51,7 @@ sub scanAlbums { if (main::SCANNER) {
 
 	my $progress = Slim::Utils::Progress->new({
 		'type'  => 'importer',
-		'name'  => 'plugin_tidal_albums',
+		'name'  => 'plugin_deezer_albums',
 		'total' => 1,
 		'every' => 1,
 	});
@@ -72,13 +60,13 @@ sub scanAlbums { if (main::SCANNER) {
 		my %missingAlbums;
 
 		main::INFOLOG && $log->is_info && $log->info("Reading albums... " . $accountName);
-		$progress->update(string('PLUGIN_TIDAL_PROGRESS_READ_ALBUMS', $accountName));
+		$progress->update(string('PLUGIN_DEEZER_PROGRESS_READ_ALBUMS', $accountName));
 
-		my $albums = Plugins::TIDAL::API::Sync->getFavorites($userId, 'albums');
+		my $albums = Plugins::Deezer::API::Sync->getFavorites($userId, 'albums');
 		$progress->total(scalar @$albums);
 
 		foreach my $album (@$albums) {
-			my $albumDetails = $cache->get('tidal_album_with_tracks_' . $album->{id});
+			my $albumDetails = $cache->get('deezer_album_with_tracks_' . $album->{id});
 
 			if (0&&$albumDetails && $albumDetails->{tracks} && ref $albumDetails->{tracks}) {
 				$progress->update($album->{title});
@@ -97,14 +85,16 @@ sub scanAlbums { if (main::SCANNER) {
 		while ( my ($albumId, $album) = each %missingAlbums ) {
 			$progress->update($album->{title});
 
-			$album->{tracks} = Plugins::TIDAL::API::Sync->albumTracks($userId, $albumId);
+			# we already have tracks through favorites but they are incomplete and don't include contributors
+			$album->{contributors} = Plugins::Deezer::API::Sync->album($userId, $albumId)->{contributors};
+			$album->{tracks} = Plugins::Deezer::API::Sync->albumTracks($userId, $albumId, $album->{title});
 
 			if (!$album->{tracks}) {
 				$log->warn("Didn't receive tracks for $album->{title}/$album->{id}");
 				next;
 			}
 
-			$cache->set('tidal_album_with_tracks_' . $albumId, $album, '3M');
+			$cache->set('deezer_album_with_tracks_' . $albumId, $album, '3M');
 
 			$class->storeTracks([
 				map { _prepareTrack($album, $_) } @{ $album->{tracks} }
@@ -123,7 +113,7 @@ sub scanArtists { if (main::SCANNER) {
 
 	my $progress = Slim::Utils::Progress->new({
 		'type'  => 'importer',
-		'name'  => 'plugin_tidal_artists',
+		'name'  => 'plugin_deezer_artists',
 		'total' => 1,
 		'every' => 1,
 	});
@@ -132,19 +122,21 @@ sub scanArtists { if (main::SCANNER) {
 		main::INFOLOG && $log->is_info && $log->info("Reading artists... " . $accountName);
 		$progress->update(string('PLUGIN_QOBUZ_PROGRESS_READ_ARTISTS', $accountName));
 
-		my $artists = Plugins::TIDAL::API::Sync->getFavorites($userId, 'artists');
+		my $artists = Plugins::Deezer::API::Sync->getFavorites($userId, 'artists');
 
 		$progress->total($progress->total + scalar @$artists);
 
 		foreach my $artist (@$artists) {
 			my $name = $artist->{name};
 
+			$artist->{cover} ||= $artist->{picture};
+
 			$progress->update($name);
 			main::SCANNER && Slim::Schema->forceCommit;
 
 			Slim::Schema::Contributor->add({
 				'artist' => $class->normalizeContributorName($name),
-				'extid'  => 'tidal:artist:' . $artist->{id},
+				'extid'  => 'deezer:artist:' . $artist->{id},
 			});
 
 			_cacheArtistPictureUrl($artist, '3M');
@@ -163,38 +155,36 @@ sub scanPlaylists { if (main::SCANNER) {
 
 	my $progress = Slim::Utils::Progress->new({
 		'type'  => 'importer',
-		'name'  => 'plugin_tidal_playlists',
+		'name'  => 'plugin_deezer_playlists',
 		'total' => 0,
 		'every' => 1,
 	});
 
 	main::INFOLOG && $log->is_info && $log->info("Removing playlists...");
 	$progress->update(string('PLAYLIST_DELETED_PROGRESS'), $progress->done);
-	my $deletePlaylists_sth = $dbh->prepare_cached("DELETE FROM tracks WHERE url LIKE 'tidal://playlist:%'");
+	my $deletePlaylists_sth = $dbh->prepare_cached("DELETE FROM tracks WHERE url LIKE 'deezer://playlist:%'");
 	$deletePlaylists_sth->execute();
 
 	while (my ($accountName, $userId) = each %$accounts) {
-		$progress->update(string('PLUGIN_TIDAL_PROGRESS_READ_PLAYLISTS', $accountName), $progress->done);
+		$progress->update(string('PLUGIN_DEEZER_PROGRESS_READ_PLAYLISTS', $accountName), $progress->done);
 
 		main::INFOLOG && $log->is_info && $log->info("Reading playlists for $accountName...");
-		my $playlists = Plugins::TIDAL::API::Sync->getFavorites($userId, 'playlists') || [];
-		my $userPlaylists = Plugins::TIDAL::API::Sync->userPlaylists($userId);
-		push @$playlists, @$userPlaylists if $userPlaylists;
+		my $playlists = Plugins::Deezer::API::Sync->getFavorites($userId, 'playlists') || [];
 
 		$progress->total($progress->total + @$playlists);
 
-		my $prefix = 'TIDAL' . string('COLON') . ' ';
+		my $prefix = 'Deezer' . string('COLON') . ' ';
 
 		main::INFOLOG && $log->is_info && $log->info(sprintf("Importing tracks for %s playlists...", scalar @$playlists));
 		foreach my $playlist (@{$playlists || []}) {
-			my $uuid = $playlist->{uuid} or next;
+			my $id = $playlist->{id} or next;
 
-			my $tracks = Plugins::TIDAL::API::Sync->playlist($userId, $uuid);
+			my $tracks = Plugins::Deezer::API::Sync->playlist($userId, $id);
 
 			$progress->update($accountName . string('COLON') . ' ' . $playlist->{title});
 			Slim::Schema->forceCommit;
 
-			my $url = "tidal://playlist:$uuid";
+			my $url = "deezer://playlist:$id";
 
 			my $playlistObj = Slim::Schema->updateOrCreate({
 				url        => $url,
@@ -209,7 +199,7 @@ sub scanPlaylists { if (main::SCANNER) {
 				},
 			});
 
-			my @trackIds = map { "tidal://$_->{id}.$ct" } @$tracks;
+			my @trackIds = map { "deezer://$_->{id}.$ct" } @$tracks;
 
 			$playlistObj->setTracks(\@trackIds) if $playlistObj && scalar @trackIds;
 			$insertTrackInTempTable_sth && $insertTrackInTempTable_sth->execute($url);
@@ -225,13 +215,13 @@ sub scanPlaylists { if (main::SCANNER) {
 sub getArtistPicture { if (main::SCANNER) {
 	my ($class, $id) = @_;
 
-	my $url = $cache->get('tidal_artist_image' . $id);
+	my $url = $cache->get('deezer_artist_image' . $id);
 
 	return $url if $url;
 
-	$id =~ s/tidal:artist://;
+	$id =~ s/deezer:artist://;
 
-	my $artist = Plugins::TIDAL::API::Sync->getArtist(undef, $id) || {};
+	my $artist = Plugins::Deezer::API::Sync->getArtist(undef, $id) || {};
 
 	if ($artist->{cover}) {
 		_cacheArtistPictureUrl($artist, '3M');
@@ -246,23 +236,23 @@ sub _cacheArtistPictureUrl {
 	my ($artist, $ttl) = @_;
 
 	if ($artist->{cover} && $artist->{id} ne $previousArtistId) {
-		$cache->set('tidal_artist_image' . 'tidal:artist:' . $artist->{id}, $artist->{cover}, $ttl || '3M');
+		$cache->set('deezer_artist_image' . 'deezer:artist:' . $artist->{id}, $artist->{cover}, $ttl || '3M');
 		$previousArtistId = $artist->{id};
 	}
 }
 
-sub trackUriPrefix { 'tidal://' }
+sub trackUriPrefix { 'deezer://' }
 
 # This code is not run in the scanner, but in LMS
 sub needsUpdate { if (!main::SCANNER) {
 	my ($class, $cb) = @_;
 
-	my $lastScanTime = $cache->get('tidal_library_last_scan') || return $cb->(1);
+	my $lastScanTime = $cache->get('deezer_library_last_scan') || return $cb->(1);
 
 	my $checkFav = sub {
 		my ($userId, $type, $previous, $acb) = @_;
 
-		Plugins::TIDAL::API::Async->new({
+		Plugins::Deezer::API::Async->new({
 			userId => $userId
 		})->getLatestCollectionTimestamp(sub {
 			my $timestamp = shift;
@@ -302,7 +292,7 @@ sub _enabledAccounts {
 	my $enabledAccounts = {};
 
 	while (my ($id, $account) = each %$accounts) {
-		$enabledAccounts->{$account->{nickname} || $account->{username}} = $id unless $dontImportAccounts->{$id}
+		$enabledAccounts->{$_->{name} || $_->{email}} = $id unless $dontImportAccounts->{$id}
 	}
 
 	return $enabledAccounts;
@@ -311,22 +301,22 @@ sub _enabledAccounts {
 sub _prepareTrack {
 	my ($album, $track) = @_;
 
-	$ct ||= Plugins::TIDAL::API::getFormat();
-	my $url = 'tidal://' . $track->{id} . ".$ct";
-
+	$ct ||= Plugins::Deezer::API::getFormat();
+	my $url = 'deezer://' . $track->{id} . ".$ct";
+	
 	my $trackData = {
 		url          => $url,
 		TITLE        => $track->{title},
 		ARTIST       => $track->{artist}->{name},
-		ARTIST_EXTID => 'tidal:artist:' . $track->{artist}->{id},
+		ARTIST_EXTID => 'deezer:artist:' . $track->{artist}->{id},
 		ALBUM        => $album->{title},
-		ALBUM_EXTID  => 'tidal:album:' . $album->{id},
+		ALBUM_EXTID  => 'deezer:album:' . $album->{id},
 		TRACKNUM     => $track->{tracknum},
-		GENRE        => 'TIDAL',
+		GENRE        => 'Deezer',
 		DISC         => $track->{disc},
 		DISCC        => $album->{numberOfVolumes} || 1,
 		SECS         => $track->{duration},
-		YEAR         => substr($album->{releaseDate} || '', 0, 4),
+		YEAR         => substr($album->{release_date} || '', 0, 4),
 		COVER        => $album->{cover},
 		AUDIO        => 1,
 		EXTID        => $url,
@@ -336,7 +326,7 @@ sub _prepareTrack {
 		RELEASETYPE  => $album->{type},
 	};
 
-	my @trackArtists = map { $_->{name} } grep { $_->{name} ne $track->{artist}->{name} } @{ $track->{artists} };
+	my @trackArtists = map { $_->{name} } grep { $_->{name} ne $track->{artist}->{name} } @{ $album->{contributors} };
 	if (scalar @trackArtists) {
 		$splitChar ||= substr(preferences('server')->get('splitList'), 0, 1);
 		$trackData->{TRACKARTIST} = join($splitChar, @trackArtists);

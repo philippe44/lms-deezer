@@ -19,6 +19,10 @@ use Slim::Utils::Strings qw(string);
 
 use Plugins::Deezer::API qw(BURL GURL UURL DEFAULT_LIMIT MAX_LIMIT DEFAULT_TTL USER_CONTENT_TTL);
 
+# for the forgetful, API that can return tracks have a {id}/tracks endpoint that only return the
+# tracks in a 'data' array. When using {id} endpoint only, there are details about the requested 
+# item then a 'track' hash that contains the 'data' array
+
 {
 	__PACKAGE__->mk_accessor( rw => qw(
 		client
@@ -82,7 +86,8 @@ sub track {
 	$self->_get("/track/$id", sub {
 		my $track = shift;
 
-		($track) = @{ Plugins::Deezer::API->cacheTrackMetadata([$track]) } if $track;
+		# even if cachable data are missing, we *want* to cache
+		($track) = @{Plugins::Deezer::API->cacheTrackMetadata( [$track], { cache => 1 } )} if $track;
 		$cb->($track);
 	});
 }
@@ -175,7 +180,8 @@ sub albumTracks {
 	$self->_get("/album/$id/tracks", sub {
 		my $album = shift;
 		my $tracks = $album->{data} if $album;
-		$tracks = Plugins::Deezer::API->cacheTrackMetadata($tracks, { album => $title }) if $tracks;
+		# only missing data in album/tracks is the album itself...
+		$tracks = Plugins::Deezer::API->cacheTrackMetadata( $tracks, { album => $title } ) if $tracks;
 
 		$cb->($tracks || []);
 	});

@@ -106,16 +106,13 @@ sub typeOfItem {
 }
 
 sub cacheTrackMetadata {
-	my ($class, $tracks, $defaults) = @_;
+	my ($class, $tracks, $params) = @_;
 	
 	return [] unless $tracks;
+	$params ||= {};
 	
-	$defaults ||= {};
-
 	return [ map {
 		my $entry = $_;
-		$entry = $entry->{item} if $entry->{item};
-
 		my $oldMeta = $cache->get( 'deezer_meta_' . $entry->{id}) || {};
 		my $icon = $class->getImageUrl($entry, 'usePlaceholder', 'track');
 
@@ -124,16 +121,19 @@ sub cacheTrackMetadata {
 			%$oldMeta,
 			id => $entry->{id},
 			title => $entry->{title},
-			artist => $entry->{artist}->{name} || $defaults->{artist},
-			album => $entry->{album}->{title} || $defaults->{album},
+			artist => $entry->{artist},
+			album => $entry->{album} ? $entry->{album}->{title} : $params->{album},
 			duration => $entry->{duration},
 			icon => $icon,
 			cover => $icon,
-			# these are only available if we do a per-track request
+			# these are only available for some requests (usually individual tracks or /tracks endpoints)
 			replay_gain => $entry->{gain} || 0,
 			disc => $entry->{disk_number},
 			tracknum => $entry->{track_position},
 		};
+		
+		# make sure we won't come back
+		$meta->{_complete} = 1 if $meta->{tracknum} || $params->{cache};
 
 		# cache track metadata aggressively
 		$cache->set( 'deezer_meta_' . $entry->{id}, $meta, time() + 90 * 86400);
@@ -141,5 +141,6 @@ sub cacheTrackMetadata {
 		$meta;
 	} @$tracks ];
 }
+
 
 1;

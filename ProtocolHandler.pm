@@ -29,10 +29,10 @@ my $cache = Slim::Utils::Cache->new;
 
 my $cryptoHelper;
 
-# https://tidal.com/browse/track/95570766
-# https://tidal.com/browse/album/95570764
-# https://tidal.com/browse/playlist/5a36919b-251c-4fa7-802c-b659aef04216
-my $URL_REGEX = qr{^https://(?:\w+\.)?deezer.com/(?:browse/)?(track|playlist|album|artist|radio)/([a-z\d-]+)}i;
+# https://deezer.com/track/95570766
+# https://deezer.com/album/95570764
+# https://deezer.com/playlist/5a36919b-251c-4fa7-802c-b659aef04216
+my $URL_REGEX = qr{^https://(?:\w+\.)?deezer.com/(track|playlist|album|artist|radio)/([a-z\d-]+)}i;
 my $URI_REGEX = qr{^deezer://(playlist|album|artist-radio|artist|radio|):?([0-9a-z-]+)}i;
 Slim::Player::ProtocolHandlers->registerURLHandler($URL_REGEX, __PACKAGE__);
 Slim::Player::ProtocolHandlers->registerURLHandler($URI_REGEX, __PACKAGE__);
@@ -84,7 +84,7 @@ sub isRepeatingStream {
 }
 
 =comment
-# some TIDAL streams are compressed in a way which causes stutter on ip3k based players
+# some streams are compressed in a way which causes stutter on ip3k based players
 sub forceTranscode {
 	my ($self, $client, $format) = @_;
 	return $format eq 'flc' && $client->model =~ /squeezebox|boom|transporter|receiver/;
@@ -434,6 +434,7 @@ sub getMetadataFor {
 
 	my $meta;
 	my $trackId;
+	my $song = $client->playingSong();
 	my $icon = $class->getIcon();
 	my $defaultMeta = {
 		bitrate   => 'N/A',
@@ -444,10 +445,11 @@ sub getMetadataFor {
 
 	# when trying to get metadata for a radio, we must be playing it
 	if ( _getRadio($url) ) {
-		my $song = $client->playingSong();
 		return $defaultMeta unless $song && $song->track->url eq $url;
 
 		$trackId = $song->pluginData('trackId');
+		return $defaultMeta unless $trackId;
+		
 		$meta = $cache->get( 'deezer_meta_' . $trackId );
 		my $bitrate = $song->pluginData('bitrate');
 		
@@ -467,8 +469,11 @@ sub getMetadataFor {
 		$meta = $cache->get( 'deezer_meta_' . ($trackId || '') );
 	}
 	
-	# if metadata is in cache
-	return $meta if $meta;
+	# if metadata is in cache and is full
+	if ( $meta && ($meta->{_complete} || ($song && $song->track->url ne $url)) ) {
+		$meta->{artist} = $meta->{artist}->{name} if ref $meta->{artist};
+		return $meta;
+	}
 
 	my $now = time();
 
@@ -490,7 +495,8 @@ sub getMetadataFor {
 			@pendingMeta = grep { $_->{id} != $trackId } @pendingMeta;
 			return unless $meta;
 
-			main::DEBUGLOG && $log->is_debug && $log->debug("found metadata for $trackId", Data::Dump::dump($meta));
+			main::INFOLOG && $log->is_info && $log->info("updating metadata for $trackId");
+			main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($meta));
 			return if @pendingMeta;
 
 			# Update the playlist time so the web will refresh, etc

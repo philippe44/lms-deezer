@@ -37,7 +37,7 @@ sub initPlugin {
 	}
 
 	Slim::Player::ProtocolHandlers->registerHandler('deezer', 'Plugins::Deezer::ProtocolHandler');
-	#Slim::Music::Import->addImporter('Plugins::Deezer::Importer', { use => 1 });
+	Slim::Music::Import->addImporter('Plugins::Deezer::Importer', { use => 1 });
 
 	$class->SUPER::initPlugin(
 		feed   => \&handleFeed,
@@ -107,7 +107,6 @@ sub postinitPlugin {
 	}
 }
 
-=comment
 sub onlineLibraryNeedsUpdate {
 	my $class = shift;
 	require Plugins::Deezer::Importer;
@@ -119,7 +118,6 @@ sub getLibraryStats {
 	my $totals = Plugins::Deezer::Importer->getLibraryStats();
 	return wantarray ? ('PLUGIN_DEEZER_NAME', $totals) : $totals;
 }
-=cut
 
 sub handleFeed {
 	my ($client, $cb, $args) = @_;
@@ -525,13 +523,13 @@ sub _renderTrack {
 	my ($item, $addArtistToTitle) = @_;
 
 	my $title = $item->{title};
-	$title .= ' - ' . $item->{artist} if $addArtistToTitle;
+	$title .= ' - ' . $item->{artist}->{name} if $addArtistToTitle;
 	my $url = "deezer://$item->{id}." . Plugins::Deezer::API::getFormat();
 
 	return {
 		name => $title,
 		line1 => $item->{title},
-		line2 => $item->{artist},
+		line2 => $item->{artist}->{name},
 		on_select => 'play',
 		url => $url,
 		play => $url,

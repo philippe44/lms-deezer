@@ -9,74 +9,71 @@ use List::Util qw(min);
 use Slim::Networking::SimpleSyncHTTP;
 use Slim::Utils::Cache;
 use Slim::Utils::Log;
+use Slim::Utils::Prefs;
 
 use Plugins::Deezer::API qw(BURL DEFAULT_LIMIT MAX_LIMIT);
 
 my $cache = Slim::Utils::Cache->new();
 my $log = logger('plugin.deezer');
+my $prefs = preferences('plugin.deezer');
 
 sub getFavorites {
 	my ($class, $userId, $type) = @_;
 
-	my $result = $class->_get("/users/$userId/favorites/$type", $userId);
+	# see if user/me or /user/userId should be used
+	my $result = $class->_get("/user/$userId/$type", $userId);
 
 	my $items = [ map {
 		my $item = $_;
-		$item->{item}->{added} = str2time(delete $item->{created}) if $item->{created};
-		$item->{item}->{cover} = Plugins::Deezer::API->getImageUrl($item->{item});
+		$item->{added} = str2time(delete $item->{time_add}) if $item->{time_add};
+		$item->{cover} = Plugins::Deezer::API->getImageUrl($item);
 
 		foreach (qw(adSupportedStreamReady allowStreaming audioModes audioQuality copyright djReady explicit
 			mediaMetadata numberOfVideos popularity premiumStreamingOnly stemReady streamReady
 			streamStartDate upc url version vibrantColor videoCover
 		)) {
-			delete $item->{item}->{$_};
+			delete $item->{$_};
 		}
 
-		$item->{item} ;
-	} @{$result->{items} || []} ] if $result;
-
+		$item;
+	} @{$result->{data} || []} ] if $result;
+	
 	return $items;
 }
 
-sub albumTracks {
+sub album {
 	my ($class, $userId, $id) = @_;
 
-	my $album = $class->_get("/albums/$id/tracks", $userId);
-	my $tracks = $album->{items} if $album;
-	$tracks = Plugins::Deezer::API->cacheTrackMetadata($tracks) if $tracks;
+	my $album = $class->_get("/album/$id", $userId);
+	return $album || {};
+}
+
+sub albumTracks {
+	my ($class, $userId, $id, $title) = @_;
+
+	my $album = $class->_get("/album/$id/tracks", $userId);
+	my $tracks = $album->{data} if $album;
+	$tracks = Plugins::Deezer::API->cacheTrackMetadata( $tracks, { album => $title } ) if $tracks;
 
 	return $tracks;
 }
 
-sub userPlaylists {
-	my ($class, $userId) = @_;
-
-	my $result = $class->_get("/users/$userId/playlists", $userId);
-
-	my $items = [ map {
-		$_->{added} = str2time(delete $_->{created}) if $_->{created};
-		$_->{cover} = Plugins::Deezer::API->getImageUrl($_);
-		$_;
-	} @{$result->{items} || []}] if $result;
-
-	return $items;
-}
-
 sub playlist {
-	my ($class, $userId, $uuid) = @_;
+	my ($class, $userId, $id) = @_;
 
-	my $playlist = $class->_get("/playlists/$uuid/items", $userId);
-	my $tracks = $playlist->{items} if $playlist;
-	$tracks = Plugins::Deezer::API->cacheTrackMetadata($tracks) if $tracks;
-
+	my $playlist = $class->_get("/playlist/$id/tracks", $userId);
+	my $tracks = Plugins::Deezer::API->cacheTrackMetadata( [ grep {
+			$_->{type} && $_->{type} eq 'track'
+	} @{$playlist->{data} || []} ]) if $playlist;
+	
 	return $tracks;
 }
 
 sub getArtist {
 	my ($class, $userId, $id) = @_;
 
-	my $artist = $class->_get("/artists/$id", $userId);
-	$artist->{cover} = Plugins::Deezer::API->getImageUrl($artist) if $artist && $artist->{picture};
+	my $artist = $class->_get("/artist/$id", $userId);
+	$artist->{cover} = Plugins::Deezer::API->getImageUrl($artist) if $artist;
 	return $artist;
 }
 
@@ -86,12 +83,13 @@ sub _get {
 	$userId ||= Plugins::Deezer::API->getSomeUserId();
 	
 	$params ||= {};
-	$params->{countryCode} ||= Plugins::Deezer::API->getCountryCode($userId);
 	$params->{limit} ||= DEFAULT_LIMIT;
 	
-	my $accounts = $prefs->get('accounts') || {};
-	my $profile  = $accounts->{$userId};
-	$params->{access_token} = $profile->{token};
+	if ($userId) {
+		my $accounts = $prefs->get('accounts') || {};
+		my $profile  = $accounts->{$userId};
+		$params->{access_token} = $profile->{token};
+	}
 
 	my $query = complex_to_query($params);
 
@@ -108,22 +106,24 @@ sub _get {
 
 		$@ && $log->error($@);
 		main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($result));
+		
+		# see note on the Async version
 
-		if (ref $result eq 'HASH' && $result->{items} && $result->{totalNumberOfItems}) {
-			my $maxItems = min(MAX_LIMIT, $result->{totalNumberOfItems});
+		if (ref $result eq 'HASH' && $result->{data} && $result->{total}) {
+			my $maxItems = min(MAX_LIMIT, $result->{total});
 			my $offset = ($params->{offset} || 0) + DEFAULT_LIMIT;
 
 			if ($maxItems > $offset) {
-				my $remaining = $result->{totalNumberOfItems} - $offset;
+				my $remaining = $result->{total} - $offset;
 				main::INFOLOG && $log->is_info && $log->info("We need to page to get $remaining more results");
 
 				my $moreResult = $class->_get($url, $userId, {
 					%$params,
-					offset => $offset,
+					index => $offset,
 				});
 
-				if ($moreResult && ref $moreResult && $moreResult->{items}) {
-					push @{$result->{items}}, @{$moreResult->{items}};
+				if ($moreResult && ref $moreResult && $moreResult->{data}) {
+					push @{$result->{data}}, @{$moreResult->{data}};
 				}
 			}
 		}
