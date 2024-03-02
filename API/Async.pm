@@ -6,7 +6,7 @@ use base qw(Slim::Utils::Accessor);
 use Async::Util;
 use Data::URIEncode qw(complex_to_query);
 use Date::Parse qw(str2time);
-use DateTime;
+use Time::Zone;
 use MIME::Base64 qw(encode_base64);
 use JSON::XS::VersionOneAndTwo;
 use List::Util qw(min maxstr reduce);
@@ -36,7 +36,7 @@ my $log = logger('plugin.deezer');
 my $prefs = preferences('plugin.deezer');
 
 my %apiClients;
-my $tzOffset = DateTime->now(time_zone => 'local')->offset;
+my $tzOffset = tz_local_offset();
 
 sub new {
 	my ($class, $args) = @_;

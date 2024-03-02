@@ -35,7 +35,7 @@ sub startScan { if (main::SCANNER) {
 			$class->scanArtists($accounts);
 		}
 
-		if (!$class->ignorePlaylists) {
+		if ($class->can('ignorePlaylists') && !$class->ignorePlaylists) {
 			$class->scanPlaylists($accounts);
 		}
 
@@ -62,13 +62,13 @@ sub scanAlbums { if (main::SCANNER) {
 		main::INFOLOG && $log->is_info && $log->info("Reading albums... " . $accountName);
 		$progress->update(string('PLUGIN_DEEZER_PROGRESS_READ_ALBUMS', $accountName));
 
-		my $albums = Plugins::Deezer::API::Sync->getFavorites($userId, 'albums');
+		my $albums = Plugins::Deezer::API::Sync->getFavorites($userId, 'albums') || [];
 		$progress->total(scalar @$albums);
 
 		foreach my $album (@$albums) {
 			my $albumDetails = $cache->get('deezer_album_with_tracks_' . $album->{id});
 
-			if (0&&$albumDetails && $albumDetails->{tracks} && ref $albumDetails->{tracks}) {
+			if ($albumDetails && $albumDetails->{tracks} && ref $albumDetails->{tracks}) {
 				$progress->update($album->{title});
 
 				$class->storeTracks([
@@ -120,9 +120,9 @@ sub scanArtists { if (main::SCANNER) {
 
 	while (my ($accountName, $userId) = each %$accounts) {
 		main::INFOLOG && $log->is_info && $log->info("Reading artists... " . $accountName);
-		$progress->update(string('PLUGIN_QOBUZ_PROGRESS_READ_ARTISTS', $accountName));
+		$progress->update(string('PLUGIN_DEEZER_PROGRESS_READ_ARTISTS', $accountName));
 
-		my $artists = Plugins::Deezer::API::Sync->getFavorites($userId, 'artists');
+		my $artists = Plugins::Deezer::API::Sync->getFavorites($userId, 'artists') || [];
 
 		$progress->total($progress->total + scalar @$artists);
 
@@ -272,7 +272,7 @@ sub needsUpdate { if (!main::SCANNER) {
 			sub { $checkFav->($userId, 'artists', @_) },
 		);
 
-		if (!$class->ignorePlaylists) {
+		if ($class->can('ignorePlaylists') && !$class->ignorePlaylists) {
 			push @tasks, sub { $checkFav->($userId, 'playlists', @_) };
 		}
 
@@ -297,7 +297,7 @@ sub _enabledAccounts {
 	my $enabledAccounts = {};
 
 	while (my ($id, $account) = each %$accounts) {
-		$enabledAccounts->{$_->{name} || $_->{email}} = $id unless $dontImportAccounts->{$id}
+		$enabledAccounts->{$account->{name} || $account->{email}} = $id unless $dontImportAccounts->{$id}
 	}
 
 	return $enabledAccounts;
