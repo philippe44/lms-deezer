@@ -268,9 +268,9 @@ sub playlist {
 # multi-stage handling as we first see that something has changed then we
 # must re-acquire the user's playlist *list*, then invalidate from cache the
 # playlists that are actually newer. Otherwise, we'd just update the playlist
-# list but _get would return the old track's list for during one day. For
-# album, artists and tracks it's less of a problem b/c it's very unlikely that
-# their content itself has changed within DEFAULT_TTL (one day)
+# list but _get would return the old track's list during DEFAULT_TTL (one day)
+# For albums, artists and tracks it's less of a problem b/c it's very unlikely 
+# that their content itself has changed within DEFAULT_TTL
 
 sub getFavorites {
 	my ($self, $cb, $type, $drill) = @_;
@@ -372,6 +372,9 @@ sub getTrackUrl {
 
 	_getUserContext( sub {
 		my ($user, $license, $csrf, $mode) = @_;
+
+		$cb->() unless $user;
+
 #$log->error("THAT WHAT WE HAVE $user, $license, $csrf");
 		my $args = {
 			method => 'song.getListData',
@@ -456,6 +459,12 @@ sub _getUserContext {
 
 	_getArl( sub {
 		my $arl = shift;
+
+		if (!$arl) {
+			$log->warn("ARL token is required, can't play");
+			$cb->();
+		}
+
 		_getTokens( $cb, $userId, { arl => $arl } );
 	}, $userId );
 }
