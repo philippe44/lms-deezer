@@ -130,7 +130,7 @@ sub handleFeed {
 			}]
 		});
 	}
-	
+
 =comment
 	{
 		name => cstring($client, 'PLUGIN_PODCAST'),
@@ -139,7 +139,7 @@ sub handleFeed {
 		passthrough => [ { id => $item->{id}, type => 'podcasts' } ],
 	}
 =cut
-	
+
 
 	my $items = [ {
 		name => cstring($client, 'PLUGIN_DEEZER_FLOW'),

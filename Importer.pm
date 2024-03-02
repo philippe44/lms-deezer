@@ -247,16 +247,21 @@ sub trackUriPrefix { 'deezer://' }
 sub needsUpdate { if (!main::SCANNER) {
 	my ($class, $cb) = @_;
 
+	return $cb->() unless scalar keys %{_enabledAccounts()};
+
 	my $lastScanTime = $cache->get('deezer_library_last_scan') || return $cb->(1);
 
 	my $checkFav = sub {
 		my ($userId, $type, $previous, $acb) = @_;
 
+		return $acb->($previous) if $previous;
+
 		Plugins::Deezer::API::Async->new({
 			userId => $userId
-		})->getLatestCollectionTimestamp(sub {
-			my $timestamp = shift;
-			$acb->($timestamp > $lastScanTime);
+		})->getCollectionFingerprint(sub {
+			my $fingerprint = shift;
+			main::INFOLOG && $log->is_info && $log->info("Last update for $type is $fingerprint->{time}");
+			$acb->($fingerprint->{time} > $lastScanTime);
 		}, $type);
 	};
 
@@ -303,7 +308,7 @@ sub _prepareTrack {
 
 	$ct ||= Plugins::Deezer::API::getFormat();
 	my $url = 'deezer://' . $track->{id} . ".$ct";
-	
+
 	my $trackData = {
 		url          => $url,
 		TITLE        => $track->{title},

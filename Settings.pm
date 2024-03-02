@@ -29,6 +29,7 @@ sub handler {
 		main::INFOLOG && $log->is_info && $log->info("Adding account using seed $params->{seed}");
 		Plugins::Deezer::API::Auth::authRegister($params->{seed}, sub {
 			my ($seed, $success) = @_;
+			$params->{'warning'} = Slim::Utils::Strings::string('PLUGIN_DEEZER_AUTH_FAILED') unless $success;
 			my $body = $class->SUPER::handler( $client, $params );
 			$callback->($client, $params, $body, @args);
 		} );
@@ -50,7 +51,7 @@ sub handler {
 			}
 			if ($prefName =~ /^pref_arl_(.*)/ && $accounts->{$1}) {
 				$accounts->{$1}->{arl} = $params->{$prefName};
-			}	
+			}
 		}
 		$prefs->set('dontImportAccounts', $dontImportAccounts);
 		$prefs->set('accounts', $accounts);
@@ -73,20 +74,20 @@ sub beforeRender {
 			arl => $_->{arl},
 		}
 	} values %$accounts] if scalar keys %$accounts;
-	
+
 	my $cid = decode_base64($Plugins::Deezer::API::Auth::serial);
 	$cid = pack('H*', $cid);
 	$cid =~ s/_.*//;
-	
+
 	my $query = complex_to_query( {
 		app_id => $cid,
 		redirect_uri => 'https://philippe44.github.io/lms-deezer/index.html?args=' .
 						Slim::Utils::Network::serverAddr() . ':' .
-						preferences('server')->get('httpport') . 
+						preferences('server')->get('httpport') .
 						"&seed=$seed",
 		perms => 'basic_access,offline_access,email,manage_library',
 	} );
-	
+
 	$params->{seed} = $seed++;
 	$params->{authLink} = AURL . '/auth.php?' . $query;
 	$params->{dontImportAccounts} = $prefs->get('dontImportAccounts') || {};

@@ -5,14 +5,23 @@ PLUGIN_DEEZER_DESC
 	DE	Deezer Plugin zur Integration mit LMS, ohne Verbindung zu MySqueezebox.com.
 	EN	Deezer Plugin for LMS, does not depend on MySqueezebox.com.
 	FR	Plugin Deezer pour LMS (sans lien avec MySqueezebox.com).
-	
+
 PLUGIN_DEEZER_REGISTER
+	DE	Klicken Sie "Konto hinzufügen" um das Deezer Loginfenster zu öffnen, und dem
+	DE	Plugin Zugriff auf ihr Konto zu geben. Der ARL Wert wird benötigt, um verlustfrei
+	DE	streamen zu können. Hinweise zum Finden des Wertes kennen Google, Youtube oder Reddit.
+	DE	<br>BEACHTEN SIE BITTE, dass das Plugin zwingend ein Premium Konto benötigt.
 	EN	Click "Add Account" to open a Deezer login page and allow the plugin to access
 	EN	your account. The ARL token is required and you can use Google, YouTube or Reddit
 	EN	to figure out of to get it. <br>PLEASE NOTE THAT ONLY PREMIUM ACCOUNT CAN BE USED
 	FR	Cliquer sur "Ajouter un compte" pour se connecter à Deezer et en accepter l'utilisation
-	FR	par le plugin. Le jeton ARL est nécessaire. Utilisez Google, YouTube ou Reddit pour 
+	FR	par le plugin. Le jeton ARL est nécessaire. Utilisez Google, YouTube ou Reddit pour
 	FR	savoir comment l'obtenir. <br>SEULS LES COMPTES PREMIUM SONT UTILISABLES.
+
+
+PLUGIN_DEEZER_AUTH_FAILED
+	DE	Anmeldung fehlgeschlagen, oder kein Premium Konto.
+	EN	Authorization failed, or no Premium account.
 
 PLUGIN_DEEZER_ADD_ACCOUNT
 	CS	Přidat účet
@@ -177,23 +186,26 @@ PLUGIN_DEEZER_TOP_TRACKS
 	NO	Mest populære spor
 	PL	Najczęściej słuchane
 	RU	Лучшие дорожки
-	SV	Toppspår	
-	
+	SV	Toppspår
+
 PLUGIN_DEEZER_ARL_TOKEN
+	DE	ARL Token
 	EN	ARL token
 	FR	Jeton ARL
-	
+
 PLUGIN_DEEZER_RELATED
+	DE	Ähnliche Interpreten
 	EN	Related
 	FR	Artistes similaires
-	
+
 PLUGIN_DEEZER_SMART_RADIO
 	EN	Smart Radio
 	NL	Radio Intelligente
 
 PLUGIN_DEEZER_FLOW
 	EN	Flow
-	
+
 PLUGIN_DEEZER_ON_DEEZER
+	DE	Auf Deezer
 	EN	On Deezer
 	FR	Sur Deezer

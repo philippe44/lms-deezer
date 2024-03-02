@@ -49,7 +49,7 @@ sub init {
 		$log->info('Using fast Crypt::Blowfish');
 		$cryptoHelper = 'Crypt::Blowfish';
 	}
-}	
+}
 
 # many method do not need override like isRemote, shouldLoop ...
 sub canSkip { 1 }	# where is this called?
@@ -122,7 +122,7 @@ sub new {
 	my $id = $song->pluginData('trackId');
 	my $md5 = md5_hex($id);
 	$key ^= substr($md5, 0, 16) ^ substr($md5, 16, 16);
-	
+
 	my $blowfish = $cryptoHelper->new($key);
 
 	${*$sock}{deezer_cipher} = Crypt::CBC->new(
@@ -169,7 +169,7 @@ sub explodePlaylist {
 
 	if ($id) {
 		my $method;
-$log->error("EXPLODE URL $url $type");		
+$log->error("EXPLODE URL $url $type");
 		return $cb->( [ $url ] ) unless $type;
 
 		if ($type eq 'playlist') {
@@ -182,10 +182,10 @@ $log->error("EXPLODE URL $url $type");
 			$method = \&Plugins::Deezer::Plugin::getArtistTopTracks;
 		}
 		elsif ($type eq 'artist-radio') {
-			return $cb->( [ "deezer://artist/$id/radio.dzr" ] )	
+			return $cb->( [ "deezer://artist/$id/radio.dzr" ] )
 		}
 		elsif ($type eq 'radio') {
-			return $cb->( [ "deezer://radio/$id/tracks.dzr" ] )	
+			return $cb->( [ "deezer://radio/$id/tracks.dzr" ] )
 		}
 
 		$method->($client, $cb, { }, { id => $id });
@@ -290,7 +290,7 @@ sub getNextTrack {
 			# metadata update request will be done below
 			my $meta = $cache->get( 'deezer_meta_' . $trackId );
 			Slim::Music::Info::setDuration( $song->track, $meta->{duration} );
-			
+
 			# pretty things up
 			$song->track->content_type($format);
 
@@ -314,27 +314,40 @@ sub getNextTrack {
 			}
 		}, $errorCb);
 	} else {
-		# this is a radio, we must get the 1st track in the list
+		my $radioTracks = $song->pluginData('radioTracks') || [];
+
+		# use tracks we have in the list (if any)
+		my $trackId = shift @$radioTracks;
+		main::INFOLOG && $log->info("we have ", scalar @$radioTracks, " radio tracks left for $path") if $trackId;
+
+		return _getNextTrack($song, $trackId, sub {
+			my ($format, $bitrate) = @_;
+
+			# make this available for when track is current
+			$song->pluginData(bitrate => $bitrate || 850_000);
+			$successCb->();
+
+		}, $errorCb ) if $trackId;
+
+		# need to fetch more...
+		main::INFOLOG && $log->info("need to fetch more radio tracks for $path");
 		Plugins::Deezer::Plugin::getAPIHandler($client)->radioTracks( sub {
 			my $items = shift;
-			my $trackId = $items->[0]->{id};
-				
-			_getNextTrack($song, $trackId, sub {
-				my ($format, $bitrate) = @_;
-				
-				# make this available for when track is current
-				$song->pluginData(bitrate => $bitrate || 850_000);
-				$successCb->();
 
-			}, $errorCb);
-		}, $path );
+			my $ids = [ map { $_->{id} } @$items ];
+			$song->pluginData('radioTracks', $ids);
+			main::INFOLOG && $log->info("acquired ", scalar @$ids, " radio tracks for $path");
+
+			return $errorCb->() unless $ids;
+			$class->getNextTrack($song, $successCb, $errorCb);
+		}, $path, 10 );
 	}
 }
 
 sub _getNextTrack {
 	my ( $song, $trackId, $successCb, $errorCb ) = @_;
 	my $client = $song->master();
-	
+
 	Plugins::Deezer::Plugin::getAPIHandler($client)->getTrackUrl(sub {
 		my $result = shift;
 		return _gotTrackError($@, $errorCb) unless $result;
@@ -347,7 +360,10 @@ sub _getNextTrack {
 		$format =~ s/flac/flc/i;
 
 		$song->streamUrl($streamUrl);
+		# radio tracks are passed from song to song in webradio mode
+		my $radioTracks = $song->pluginData('radioTracks');
 		$song->pluginData({ });
+		$song->pluginData('radioTracks', $radioTracks) if $radioTracks;
 		$song->pluginData(format => $format);
 		$song->pluginData(trackId => $trackId);
 
@@ -366,7 +382,7 @@ sub _parseFlac {
 	my $key = $Plugins::Deezer::API::Auth::cbc;
 	my $md5 = md5_hex($song->pluginData('trackId'));
 	$key ^= substr($md5, 0, 16) ^ substr($md5, 16, 16);
-	
+
 	my $blowfish = $cryptoHelper->new($key);
 
 	my $cipher = Crypt::CBC->new(
@@ -403,7 +419,7 @@ sub _parseFlac {
 				Slim::Music::Info::setBitrate( $song->track, $bitrate );
 				$log->warn("Failed to get flac bitrate for track id", $song->pluginData('trackId'), ", guessing it at $bitrate");
 			}
-			
+
 			return $more;
 		},
 		onError 	=> $cb,
@@ -449,10 +465,10 @@ sub getMetadataFor {
 
 		$trackId = $song->pluginData('trackId');
 		return $defaultMeta unless $trackId;
-		
+
 		$meta = $cache->get( 'deezer_meta_' . $trackId );
 		my $bitrate = $song->pluginData('bitrate');
-		
+
 		# bitrate still in pluginData shall trigger update of current track
 		if ($bitrate && $meta) {
 			Slim::Music::Info::setDuration( $song->track, $meta->{duration} );
@@ -468,7 +484,7 @@ sub getMetadataFor {
 		return $defaultMeta unless $trackId;
 		$meta = $cache->get( 'deezer_meta_' . ($trackId || '') );
 	}
-	
+
 	# if metadata is in cache and is full
 	if ( $meta && ($meta->{_complete} || ($song && $song->track->url ne $url)) ) {
 		$meta->{artist} = $meta->{artist}->{name} if ref $meta->{artist};
