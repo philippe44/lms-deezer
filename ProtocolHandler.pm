@@ -57,8 +57,9 @@ sub canDirectStream { 0 }
 
 sub canSeek {
 	my ($class, $client, $song) = @_;
-	# can't (don't want to) seek radios
-	return !_getRadio($song->track->url);
+	my $url = $song->track()->url;
+	# can't (don't want to) seek radio/flow
+	return !(_getRadio($url) || _getFlow($url));
 }
 
 sub getFormatForURL {
@@ -80,7 +81,8 @@ sub canEnhanceHTTP {
 
 sub isRepeatingStream {
 	my ( $class, $song ) = @_;
-	return $song->track()->url =~ /\.dzr$/;
+	my $url = $song->track()->url;
+	return _getRadio($url) || _getFlow($url);
 }
 
 =comment
@@ -262,12 +264,6 @@ sub _sysread {
 	return undef;
 }
 
-sub _gotTrackError {
-	my ( $error, $errorCb ) = @_;
-	main::DEBUGLOG && $log->debug("Error during getTrackInfo: $error");
-	$errorCb->($error);
-}
-
 sub getNextTrack {
 	my ( $class, $song, $successCb, $errorCb ) = @_;
 
@@ -275,16 +271,66 @@ sub getNextTrack {
 	my $url = $song->track->url;
 	my $path = _getRadio($url);
 
-	if (! $path ) {
-		# this is a track id, we can process directly
-		my $trackId = _getId($url);
+	if (my $radio = _getRadio($url)) {
+		# use tracks we have in the list (if any)
+		my $radioTracks = $song->pluginData('radioTracks') || [];
+		my $trackId = shift @$radioTracks;
+		main::INFOLOG && $log->info("we have ", scalar @$radioTracks, " radio tracks left for $path") if $trackId;
 
-		if (!$trackId) {
-			$log->error("can't get trackId");
-			return $errorCb->();
-		}
+		# process if we have at least one track
+		return _getNextTrack( $song, $trackId, sub {
+			my ($format, $bitrate) = @_;
 
-		_getNextTrack($song, $trackId, sub {
+			# make this available for when track is current
+			$song->pluginData(bitrate => $bitrate || 850_000);
+			$successCb->();
+
+		}, $errorCb, 'radioTracks' ) if $trackId;
+
+		# need to fetch more...
+		main::INFOLOG && $log->info("need to fetch more radio tracks for $path");
+		Plugins::Deezer::Plugin::getAPIHandler($client)->radioTracks( sub {
+			my $items = shift;
+
+			my $ids = [ map { $_->{id} } @$items ];
+			$song->pluginData('radioTracks', $ids);
+			main::INFOLOG && $log->info("acquired ", scalar @$ids, " radio tracks for $path");
+
+			return $errorCb->() unless $ids;
+			$class->getNextTrack($song, $successCb, $errorCb);
+		}, $path, 10 );
+	} elsif (my ($mode, $type) = _getFlow($url)) {
+		# use tracks we have in the list (if any)
+		my $flowTracks = $song->pluginData('flowTracks') || [];
+		my $track = shift @$flowTracks;
+
+		main::INFOLOG && $log->info("we have ", scalar @$flowTracks, " flow tracks left for $mode\@$type") if $track;
+
+		# process if we have at least one track
+		return _setTrackParams($song, $track, sub {
+			my ($format, $bitrate) = @_;
+
+			# make this available for when track is current
+			$song->pluginData(bitrate => $bitrate || 850_000);
+			$successCb->();
+
+		}, $errorCb, 'flowTracks' ) if $track;
+
+		main::INFOLOG && $log->info("need to fetch more flow tracks for $mode\@$type");
+		Plugins::Deezer::Plugin::getAPIHandler($client)->flowTracks( sub {
+			my $tracks = shift;
+			$song->pluginData('flowTracks', $tracks);
+			main::INFOLOG && $log->info("acquired ", scalar @$tracks, " flow tracks for $type\@$mode");
+
+			return $errorCb->("no flow track") unless $tracks;
+			$class->getNextTrack($song, $successCb, $errorCb);
+		}, {
+			mode => $mode,
+			type => $type,
+			quality => Plugins::Deezer::API::getQuality(),
+		} );
+	} elsif (my $trackId = _getId($url)) {
+		_getNextTrack( $song, $trackId, sub {
 			my ($format, $bitrate) = @_;
 
 			# metadata update request will be done below
@@ -312,66 +358,51 @@ sub getNextTrack {
 					}, $song
 				);
 			}
-		}, $errorCb);
+		}, $errorCb );
 	} else {
-		my $radioTracks = $song->pluginData('radioTracks') || [];
-
-		# use tracks we have in the list (if any)
-		my $trackId = shift @$radioTracks;
-		main::INFOLOG && $log->info("we have ", scalar @$radioTracks, " radio tracks left for $path") if $trackId;
-
-		return _getNextTrack($song, $trackId, sub {
-			my ($format, $bitrate) = @_;
-
-			# make this available for when track is current
-			$song->pluginData(bitrate => $bitrate || 850_000);
-			$successCb->();
-
-		}, $errorCb ) if $trackId;
-
-		# need to fetch more...
-		main::INFOLOG && $log->info("need to fetch more radio tracks for $path");
-		Plugins::Deezer::Plugin::getAPIHandler($client)->radioTracks( sub {
-			my $items = shift;
-
-			my $ids = [ map { $_->{id} } @$items ];
-			$song->pluginData('radioTracks', $ids);
-			main::INFOLOG && $log->info("acquired ", scalar @$ids, " radio tracks for $path");
-
-			return $errorCb->() unless $ids;
-			$class->getNextTrack($song, $successCb, $errorCb);
-		}, $path, 10 );
+		$log->error("can't get next track, unknown url $url");
+		return $errorCb->();
 	}
 }
 
 sub _getNextTrack {
-	my ( $song, $trackId, $successCb, $errorCb ) = @_;
+	my ( $song, $trackId, $successCb, $errorCb, $linger ) = @_;
 	my $client = $song->master();
 
-	Plugins::Deezer::Plugin::getAPIHandler($client)->getTrackUrl(sub {
+	Plugins::Deezer::Plugin::getAPIHandler($client)->getTrackUrl( sub {
 		my $result = shift;
-		return _gotTrackError($@, $errorCb) unless $result;
+		return $errorCb->($@) unless @$result;
 
-		my $chosen = $result->[0];
+		_setTrackParams($song, $result->[0], $successCb, $errorCb, $linger);
 
-		my ($format, $bitrate) = $chosen->{format} =~ /([^_]+)_?(\d+)?/i;
-		my $streamUrl = $chosen->{urls}[rand(scalar @{$chosen->{urls}})];
-		$format = lc($format);
-		$format =~ s/flac/flc/i;
+	}, [ $trackId ], { quality => Plugins::Deezer::API::getQuality() } );
 
-		$song->streamUrl($streamUrl);
-		# radio tracks are passed from song to song in webradio mode
-		my $radioTracks = $song->pluginData('radioTracks');
-		$song->pluginData({ });
-		$song->pluginData('radioTracks', $radioTracks) if $radioTracks;
-		$song->pluginData(format => $format);
-		$song->pluginData(trackId => $trackId);
+	main::DEBUGLOG && $log->is_debug && $log->debug("Getting next track playback info for ", $song->track->url);
+}
 
-		$successCb->($format, $bitrate * 1000);
-	}, $trackId,
-	{
-		quality => Plugins::Deezer::API::getQuality(),
-	});
+sub _setTrackParams {
+	my ( $song, $track, $successCb, $errorCb, $linger ) = @_;
+	return $errorCb('no track available') unless $track;
+
+	my $client = $song->master();
+	my ($format, $bitrate) = $track->{format} =~ /([^_]+)_?(\d+)?/i;
+	my $streamUrl = $track->{urls}[rand(scalar @{$track->{urls}})];
+	$format = lc($format);
+	$format =~ s/flac/flc/i;
+
+	$song->streamUrl($streamUrl);
+
+	# some pluginData needs to be carried over
+	my $lingerItem = $song->pluginData($linger) if $linger;
+
+	# need to reset it as it's just a hash pointing to previous song's pluginData
+	$song->pluginData({ });
+
+	$song->pluginData($linger, $lingerItem) if $lingerItem;
+	$song->pluginData(format => $format);
+	$song->pluginData(trackId => $track->{id});
+
+	$successCb->($format, $bitrate * 1000);
 
 	main::DEBUGLOG && $log->is_debug && $log->debug("Getting next track playback info for ", $song->track->url);
 }
@@ -459,8 +490,8 @@ sub getMetadataFor {
 		cover     => $icon,
 	};
 
-	# when trying to get metadata for a radio, we must be playing it
-	if ( _getRadio($url) ) {
+	# when trying to get metadata for a radio/flow, we must be playing it
+	if ( _getRadio($url) || _getFlow($url) ) {
 		return $defaultMeta unless $song && $song->track->url eq $url;
 
 		$trackId = $song->pluginData('trackId');
@@ -537,6 +568,11 @@ sub _getId {
 sub _getRadio{
 	my ($path) = $_[0] =~ m|deezer://(.+)\.dzr$|;
 	return $path;
+}
+
+sub _getFlow{
+	my ($flow, $type) = $_[0] =~ /deezer:\/\/(genre|mood):(.+)\.flow$/;
+	return $flow ? ($flow, $type) : ();
 }
 
 1;

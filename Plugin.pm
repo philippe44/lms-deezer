@@ -144,9 +144,21 @@ sub handleFeed {
 	my $items = [ {
 		name => cstring($client, 'PLUGIN_DEEZER_FLOW'),
 		image => 'plugins/Deezer/html/logo.png',
-		on_select => 'play',
 		play => 'deezer://user/me/flow.dzr',
-		url => 'deezer://user/me/flow.dzr',
+		type => 'outline',
+		items => [{
+			name => cstring($client, 'GENRES'),
+			image => 'html/images/genres.png',
+			type => 'link',
+			url => \&getFlow,
+			passthrough => [{ mode => 'genres' }],
+		},{
+			name => cstring($client, 'PLUGIN_DEEZER_MOODS'),
+			image => 'plugins/Deezer/html/moods_MTL_icon_celebration.png',
+			type => 'link',
+			url => \&getFlow,
+			passthrough => [{ mode => 'moods' }],
+		}],
 	},{
 		name => cstring($client, 'PLAYLISTS'),
 		image => 'html/images/playlists.png',
@@ -324,6 +336,27 @@ sub getGenres {
 
 		$callback->( { items => $items } );
 	});
+}
+
+sub getFlow {
+	my ( $client, $callback, $args, $params ) = @_;
+
+	my $mode = $params->{mode} =~ /genre/ ? 'genre' : 'mood';
+	my @categories = $mode eq 'genre' ?
+					( 'pop', 'rap', 'rock', 'alternative', 'kpop') :
+					( 'motivation', 'party', 'chill', 'melancholy', 'you_and_me', 'focus');
+
+	my $items = [ map {
+		{
+			name => cstring($client, 'PLUGIN_DEEZER_' . uc($_)),
+			play => "deezer://$mode:" . $_ . '.flow',
+			url => "deezer://$mode:" . $_ . '.flow',
+			#favorites_url => "deezer://$mode:' . $_ . '.flow',
+			image => 'plugins/Deezer/html/' . $_ . '.png',
+		}
+	} @categories ];
+
+	$callback->( { items => $items } );
 }
 
 sub getRadios {

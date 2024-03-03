@@ -111,7 +111,7 @@ sub _get {
 
 		if (ref $result eq 'HASH' && $result->{data} && $result->{total}) {
 			my $maxItems = min(MAX_LIMIT, $result->{total});
-			my $offset = ($params->{offset} || 0) + DEFAULT_LIMIT;
+			my $offset = ($params->{index} || 0) + DEFAULT_LIMIT;
 
 			if ($maxItems > $offset) {
 				my $remaining = $result->{total} - $offset;

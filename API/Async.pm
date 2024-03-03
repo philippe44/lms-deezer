@@ -9,7 +9,7 @@ use Date::Parse qw(str2time);
 use Time::Zone;
 use MIME::Base64 qw(encode_base64);
 use JSON::XS::VersionOneAndTwo;
-use List::Util qw(min maxstr reduce);
+use List::Util qw(min);
 use Digest::MD5 qw(md5_hex);
 
 use Slim::Networking::SimpleAsyncHTTP;
@@ -160,6 +160,36 @@ sub radioTracks {
 		_nocache => 1,
 		limit => $count || 1,
 	});
+}
+
+sub flowTracks {
+	my ($self, $cb, $params) = @_;
+
+	$self->_getUserContext( sub {
+		my ($user, $license, $csrf, $mode) = @_;
+		return $cb->([]) unless $user;
+	
+		my $args = {
+			method => 'radio.getUserRadio',
+			apiToken => $csrf,
+			contentType => 'application/json',
+		};
+
+		my $content = encode_json( { 
+			config_id => ($params->{mode} eq 'genre' ?  'genre-' : '') . $params->{type},
+			user_id => $self->userId,
+		} );
+
+		$self->_ajax( sub {
+			my $result = shift;
+			my @trackTokens = map { $_->{TRACK_TOKEN} } @{ $result->{results}->{data} };
+			my @trackIds = map { $_->{SNG_ID} } @{ $result->{results}->{data} };
+#$log->error(Data::Dump::dump(\@trackTokens), Data::Dump::dump(\@trackIds));
+			return $cb->([]) unless @trackTokens;
+
+			$self->_getProviders( $cb, $license, $params->{quality}, \@trackTokens, \@trackIds );
+		}, $args, $content );
+	} );	
 }
 
 sub compound {
@@ -366,11 +396,9 @@ sub getCollectionFingerprint {
 }
 
 sub getTrackUrl {
-	my ($self, $cb, $id, $params) = @_;
+	my ($self, $cb, $ids, $params) = @_;
 
-	my $userId = $self->userId;
-
-	_getUserContext( sub {
+	$self->_getUserContext( sub {
 		my ($user, $license, $csrf, $mode) = @_;
 
 		$cb->() unless $user;
@@ -383,23 +411,23 @@ sub getTrackUrl {
 			cookies => $mode,
 		};
 
-		my $content = encode_json( { sng_ids => [$id] } );
+		my $content = encode_json( { sng_ids => $ids } );
 
-		_ajax( sub {
+		$self->_ajax( sub {
 			my $result = shift;
 			my @trackTokens = map { $_->{TRACK_TOKEN} } @{ $result->{results}->{data} };
 			my @trackIds = map { $_->{SNG_ID} } @{ $result->{results}->{data} };
 #$log->error(Data::Dump::dump(\@trackTokens), Data::Dump::dump(\@trackIds));
 
-			return $cb->() unless @trackTokens && $trackIds[0] == $id;
+			return $cb->() unless @trackTokens;
 
-			_getProviders($cb, $license, $params->{quality}, \@trackTokens)
+			$self->_getProviders( $cb, $license, $params->{quality}, \@trackTokens );
 		}, $args, $content);
-	}, $userId );
+	} );
 }
 
 sub _getProviders {
-	my ($cb, $license, $quality, $tracks) = @_;
+	my ($self, $cb, $license, $quality, $trackTokens, $trackIds) = @_;
 
 	# Deezer does not send all formats but only one so
 	# you must be sure what you want. It will send the
@@ -421,7 +449,7 @@ sub _getProviders {
 	} if ($quality eq 'LOSSLESS');
 
 	my $content = encode_json( {
-		track_tokens => $tracks,
+		track_tokens => $trackTokens,
 		license_token => $license,
 		media => [{
 			type => 'FULL',
@@ -432,32 +460,39 @@ sub _getProviders {
 	Slim::Networking::SimpleAsyncHTTP->new(
 		sub {
 			my $result = eval { from_json(shift->content) };
-
+			my $tracks = [];
+			
 			$@ && $log->error($@);
 			$log->debug(Data::Dump::dump($result)) if $@ || (main::DEBUGLOG && $log->is_debug);
-			my $media = $result->{data}->[0]->{media};
-#$log->error(Data::Dump::dump($media));
-			my $tracks = [ {
-				format => $media->[0]->{format},
-				urls => [ map { $_->{url} } @{$media->[0]->{sources}} ],
-			} ];
-
+			
+			# stitch back the track Ids whch should be in same array order...
+			foreach my $i (0...$#{$result->{data}} ) {
+				my $media = $result->{data}->[$i]->{media};
+				next unless $media;
+				push @$tracks, {
+					id => $trackIds->[$i],
+					format => $media->[0]->{format},
+					urls => [ map { $_->{url} } @{$media->[0]->{sources}} ],
+				};
+			}
 #$log->error(Data::Dump::dump($tracks));
+
+			$log->warn("can't get tracks: ", Data::Dump::dump($result)) unless scalar @$tracks;
 			$cb->($tracks);
 		},
 		sub {
 			my ($http, $error) = @_;
 			$log->warn("Error: $error");
 			main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($http));
-			$cb->();
+			$cb->([]);
 		},
 	)->post(UURL, ContentType => 'application/json', $content);
 }
 
 sub _getUserContext {
-	my ($cb, $userId) = @_;
+	my ($self, $cb) = @_;
 
-	_getArl( sub {
+	$self->_getArl( sub {
 		my $arl = shift;
 
 		if (!$arl) {
@@ -465,26 +500,26 @@ sub _getUserContext {
 			$cb->();
 		}
 
-		_getTokens( $cb, $userId, { arl => $arl } );
-	}, $userId );
+		$self->_getTokens( $cb, { arl => $arl } );
+	} );
 }
 
 sub _getArl {
-	my ($cb, $userId) = @_;
+	my ($self, $cb) = @_;
 	my $accounts = $prefs->get('accounts') || {};
-	my $profile  = $accounts->{$userId};
+	my $profile  = $accounts->{$self->userId};
 	$cb->($profile->{status} == 2 ? $profile->{arl}: '');
 }
 
 sub _getTokens {
-	my ($cb, $userId, $mode) = @_;
+	my ($self, $cb, $mode) = @_;
 
 	my $params = {
 		method => 'deezer.getUserData',
 		cookies => $mode,
 	};
 
-	_ajax( sub {
+	$self->_ajax( sub {
 		my $result = shift;
 		my $userToken = $result->{results}->{USER_TOKEN};
 		my $licenseToken = $result->{results}->{USER}->{OPTIONS}->{license_token};
@@ -496,7 +531,7 @@ sub _getTokens {
 }
 
 sub _getSession {
-	my ($cb) = @_;
+	my ($self, $cb) = @_;
 
 	my $session = $cache->get('deezer_session');
 
@@ -508,14 +543,14 @@ sub _getSession {
 
 	main::INFOLOG && $log->is_info && $log->info("Need a new session");
 
-	_ajax( sub {
+	$self->_ajax( sub {
 			$session = shift->{results}->{SESSION};
 			$cb->($session);
 	}, { method => 'deezer.ping' } );
 }
 
 sub _ajax {
-	my ($cb, $params, $content) = @_;
+	my ($self, $cb, $params, $content) = @_;
 
 	my %headers = ( ContentType => $params->{contentType} || 'application/x-www-form-urlencoded' );
 	my $cookies = $params->{cookies};
@@ -528,9 +563,8 @@ sub _ajax {
 		api_token => $params->{apiToken} || 'null',
 	} );
 
-#$log->error("MY QUERY IS", $query, "\nheaders: ", Data::Dump::dump(%headers), "\ncontent: $content");
-
 	my $method = $content ? 'post' : 'get';
+	main::INFOLOG && $log->is_info && $log->info(uc($method) . " ?$query ", $content ? Data::Dump::dump($content) : '');
 
 	Slim::Networking::SimpleAsyncHTTP->new(
 		sub {
