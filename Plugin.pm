@@ -147,6 +147,12 @@ sub handleFeed {
 		play => 'deezer://user/me/flow.dzr',
 		type => 'outline',
 		items => [{
+			name => cstring($client, 'PLUGIN_DEEZER_FLOW'),
+			image => 'plugins/Deezer/html/logo.png',
+			on_select => 'play',			
+			url => 'deezer://user/me/flow.dzr',	
+			play => 'deezer://user/me/flow.dzr',
+		},{
 			name => cstring($client, 'GENRES'),
 			image => 'html/images/genres.png',
 			type => 'link',
@@ -343,7 +349,9 @@ sub getFlow {
 
 	my $mode = $params->{mode} =~ /genre/ ? 'genre' : 'mood';
 	my @categories = $mode eq 'genre' ?
-					( 'pop', 'rap', 'rock', 'alternative', 'kpop') :
+					( 'pop', 'rap', 'rock', 'alternative', 'kpop', 'jazz', 'classical', 
+					  'chanson', 'reggae', 'latin', 'soul', 'variete', 'lofi', 'rnb',
+					  'danceedm' ) :
 					( 'motivation', 'party', 'chill', 'melancholy', 'you_and_me', 'focus');
 
 	my $items = [ map {
