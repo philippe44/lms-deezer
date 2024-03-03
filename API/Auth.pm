@@ -6,6 +6,7 @@ use JSON::XS::VersionOneAndTwo;
 use Digest::SHA qw(sha512_hex);
 use MIME::Base64 qw(decode_base64);
 use URI::Escape qw(uri_unescape);
+use URI::QueryParam;
 
 use Slim::Networking::SimpleAsyncHTTP;
 use Slim::Utils::Cache;

@@ -421,7 +421,7 @@ sub getTrackUrl {
 
 			return $cb->() unless @trackTokens;
 
-			$self->_getProviders( $cb, $license, $params->{quality}, \@trackTokens );
+			$self->_getProviders( $cb, $license, $params->{quality}, \@trackTokens, \@trackIds );
 		}, $args, $content);
 	} );
 }
