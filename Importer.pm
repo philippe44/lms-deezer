@@ -35,7 +35,7 @@ sub startScan { if (main::SCANNER) {
 			$class->scanArtists($accounts);
 		}
 
-		if ($class->can('ignorePlaylists') && !$class->ignorePlaylists) {
+		if (!$class->can('ignorePlaylists') || !$class->ignorePlaylists) {
 			$class->scanPlaylists($accounts);
 		}
 
@@ -272,7 +272,7 @@ sub needsUpdate { if (!main::SCANNER) {
 			sub { $checkFav->($userId, 'artists', @_) },
 		);
 
-		if ($class->can('ignorePlaylists') && !$class->ignorePlaylists) {
+		if (!$class->can('ignorePlaylists') || !$class->ignorePlaylists) {
 			push @tasks, sub { $checkFav->($userId, 'playlists', @_) };
 		}
 

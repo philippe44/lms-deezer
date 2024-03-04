@@ -298,7 +298,7 @@ sub getNextTrack {
 		my $flowTracks = $song->pluginData('flowTracks') || [];
 		my $track = shift @$flowTracks;
 
-		main::INFOLOG && $log->info("we have ", scalar @$flowTracks, " flow tracks left for $mode\@$type") if $track;
+		main::INFOLOG && $log->info("we have ", scalar @$flowTracks, " flow tracks left for $type\@$mode") if $track;
 
 		# process if we have at least one track
 		return _setTrackParams($song, $track, sub {
