@@ -32,8 +32,8 @@ my $cryptoHelper;
 # https://deezer.com/track/95570766
 # https://deezer.com/album/95570764
 # https://deezer.com/playlist/5a36919b-251c-4fa7-802c-b659aef04216
-my $URL_REGEX = qr{^https://(?:\w+\.)?deezer.com/(track|playlist|album|artist|radio)/([a-z\d-]+)}i;
-my $URI_REGEX = qr{^deezer://(playlist|album|artist-radio|artist|radio|):?([0-9a-z-]+)}i;
+my $URL_REGEX = qr{^https://(?:\w+\.)?deezer.com/(track|playlist|album|artist)/([a-z\d-]+)}i;
+my $URI_REGEX = qr{^deezer://(playlist|album|artist|):?([0-9a-z-]+)}i;
 Slim::Player::ProtocolHandlers->registerURLHandler($URL_REGEX, __PACKAGE__);
 Slim::Player::ProtocolHandlers->registerURLHandler($URI_REGEX, __PACKAGE__);
 
@@ -171,7 +171,7 @@ sub explodePlaylist {
 
 	if ($id) {
 		my $method;
-$log->error("EXPLODE URL $url $type");
+		
 		return $cb->( [ $url ] ) unless $type;
 
 		if ($type eq 'playlist') {
@@ -183,15 +183,9 @@ $log->error("EXPLODE URL $url $type");
 		elsif ($type eq 'artist') {
 			$method = \&Plugins::Deezer::Plugin::getArtistTopTracks;
 		}
-		elsif ($type eq 'artist-radio') {
-			return $cb->( [ "deezer://artist/$id/radio.dzr" ] )
-		}
-		elsif ($type eq 'radio') {
-			return $cb->( [ "deezer://radio/$id/tracks.dzr" ] )
-		}
 
 		$method->($client, $cb, { }, { id => $id });
-		main::INFOLOG && $log->is_info && $log->info("Getting $url: method: $method, id: $id");
+		main::INFOLOG && $log->is_info && $log->info("Getting $url, type:$type, id:$id");
 	}
 	else {
 		$cb->([]);
@@ -319,10 +313,10 @@ sub getNextTrack {
 		main::INFOLOG && $log->info("need to fetch more flow tracks for $mode\@$type");
 		Plugins::Deezer::Plugin::getAPIHandler($client)->flowTracks( sub {
 			my $tracks = shift;
-			$song->pluginData('flowTracks', $tracks);
-			main::INFOLOG && $log->info("acquired ", scalar @$tracks, " flow tracks for $type\@$mode");
+			return $errorCb->("no flow track") unless $tracks && @$tracks;
 
-			return $errorCb->("no flow track") unless $tracks;
+			main::INFOLOG && $log->info("acquired ", scalar @$tracks, " flow tracks for $type\@$mode");			
+			$song->pluginData('flowTracks', $tracks);
 			$class->getNextTrack($song, $successCb, $errorCb);
 		}, {
 			mode => $mode,
@@ -371,7 +365,7 @@ sub _getNextTrack {
 
 	Plugins::Deezer::Plugin::getAPIHandler($client)->getTrackUrl( sub {
 		my $result = shift;
-		return $errorCb->($@) unless @$result;
+		return $errorCb->($@) unless $result && @$result;
 
 		_setTrackParams($song, $result->[0], $successCb, $errorCb, $linger);
 

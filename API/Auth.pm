@@ -93,7 +93,7 @@ sub authCallback {
 	# make sure this is not a rogue call
 	return $log->warn("unexpected auth callback $seed") unless $waiters{$seed};
 	
-$log->error("GOT OAUTH CODE $code WITH SEED $seed");
+#$log->error("GOT OAUTH CODE $code WITH SEED $seed");
 	
 	my $epilog = sub {
 		my $httpCode  = shift;
@@ -124,7 +124,7 @@ $log->error("GOT OAUTH CODE $code WITH SEED $seed");
 
 			my $userId = $user->{id};
 			main::INFOLOG && $log->is_info && $log->info("Got token for user $user->{name} using seed $seed");
-$log->error("TOKEN IS $token->{access_token}");
+#$log->error("TOKEN IS $token->{access_token}");
 
 			my $accounts = $prefs->get('accounts');
 			my %account = (%{$accounts->{$userId} || {}}, 

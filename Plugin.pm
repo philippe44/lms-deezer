@@ -30,6 +30,7 @@ sub initPlugin {
 
 	Plugins::Deezer::API::Auth->init();
 	Plugins::Deezer::ProtocolHandler->init();
+	Plugins::Deezer::API::Async->init();
 
 	if (main::WEBUI) {
 		require Plugins::Deezer::Settings;
@@ -545,7 +546,7 @@ sub _renderRadio {
 	return {
 		name => $item->{title},
 		line1 => $item->{description},
-		favorites_url => 'deezer://radio:' . $item->{id},
+		#favorites_url => 'deezer://radio:' . $item->{id},
 		play => "deezer://radio/$item->{id}/tracks.dzr",
 		url => "deezer://radio/$item->{id}/tracks.dzr",
 		image => Plugins::Deezer::API->getImageUrl($item),
@@ -606,7 +607,7 @@ sub _renderArtist {
 	}, {
 		name => cstring($client, 'RADIO'),
 		on_select => 'play',
-		favorites_url => 'deezer://artist-radio:' . $item->{id},
+		#favorites_url => 'deezer://artist-radio:' . $item->{id},
 		favorites_title => "$item->{name}'s radio",
 		play => "deezer://artist/$item->{id}/radio.dzr",
 		url => "deezer://artist/$item->{id}/radio.dzr",

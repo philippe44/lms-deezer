@@ -51,6 +51,7 @@ sub handler {
 			}
 			if ($prefName =~ /^pref_arl_(.*)/ && $accounts->{$1}) {
 				$accounts->{$1}->{arl} = $params->{$prefName};
+				Plugins::Deezer::API::Async::refreshArl($accounts->{$1}->{id});
 			}
 		}
 		$prefs->set('dontImportAccounts', $dontImportAccounts);

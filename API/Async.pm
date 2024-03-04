@@ -38,6 +38,50 @@ my $prefs = preferences('plugin.deezer');
 my %apiClients;
 my $tzOffset = tz_local_offset();
 
+sub init {
+	my $accounts = $prefs->get("accounts");
+	refreshArl($_) foreach (keys %$accounts);
+}
+
+sub refreshArl {
+	my ($userId) = @_;
+
+	my $accounts = $prefs->get("accounts");
+	my $profile = $accounts->{$userId};
+
+	# stop refreshing if we don't have profile anymore
+	return unless $profile && $profile->{arl};
+
+	main::INFOLOG && $log->is_info && $log->info("Refreshing Arl for user $userId");
+	Slim::Utils::Timers::killTimers($userId, \&refreshArl);
+
+	__PACKAGE__->_getTokens( sub {
+		my ($tokens, $mode) = @_;
+
+		my $args = {
+			method => 'user.getArl',
+			apiToken => $tokens->{csrf},
+			cookies => $mode,
+		};
+
+		__PACKAGE__->_ajax( sub {
+			my $result = shift;
+
+			# stop refreshing if profile has been destroyed meanwhile
+			return unless $profile->{arl};
+
+			if ( $result && $result->{results} ) {
+				$profile->{arl} = $result->{results};
+				$prefs->set('accounts', $accounts);
+			}
+
+			# (re)starting refresh timer
+			main::INFOLOG && $log->is_info && $log->info("Refreshed Arl for user $userId");
+			Slim::Utils::Timers::setTimer($userId, time() + 24 * 3600, \&refreshArl, $userId);
+		}, $args );
+	}, { arl => $profile->{arl} } );
+}
+
 sub new {
 	my ($class, $args) = @_;
 
@@ -166,16 +210,16 @@ sub flowTracks {
 	my ($self, $cb, $params) = @_;
 
 	$self->_getUserContext( sub {
-		my ($user, $license, $csrf, $mode) = @_;
-		return $cb->([]) unless $user;
-	
+		my ($tokens, $mode) = @_;
+		return $cb->() unless $tokens;
+
 		my $args = {
 			method => 'radio.getUserRadio',
-			apiToken => $csrf,
+			apiToken => $tokens->{csrf},
 			contentType => 'application/json',
 		};
 
-		my $content = encode_json( { 
+		my $content = encode_json( {
 			config_id => ($params->{mode} eq 'genre' ?  'genre-' : '') . $params->{type},
 			user_id => $self->userId,
 		} );
@@ -185,11 +229,11 @@ sub flowTracks {
 			my @trackTokens = map { $_->{TRACK_TOKEN} } @{ $result->{results}->{data} };
 			my @trackIds = map { $_->{SNG_ID} } @{ $result->{results}->{data} };
 #$log->error(Data::Dump::dump(\@trackTokens), Data::Dump::dump(\@trackIds));
-			return $cb->([]) unless @trackTokens;
+			return $cb->() unless @trackTokens;
 
-			$self->_getProviders( $cb, $license, $params->{quality}, \@trackTokens, \@trackIds );
+			$self->_getProviders( $cb, $tokens->{license}, $params->{quality}, \@trackTokens, \@trackIds );
 		}, $args, $content );
-	} );	
+	} );
 }
 
 sub compound {
@@ -299,7 +343,7 @@ sub playlist {
 # must re-acquire the user's playlist *list*, then invalidate from cache the
 # playlists that are actually newer. Otherwise, we'd just update the playlist
 # list but _get would return the old track's list during DEFAULT_TTL (one day)
-# For albums, artists and tracks it's less of a problem b/c it's very unlikely 
+# For albums, artists and tracks it's less of a problem b/c it's very unlikely
 # that their content itself has changed within DEFAULT_TTL
 
 sub getFavorites {
@@ -399,14 +443,13 @@ sub getTrackUrl {
 	my ($self, $cb, $ids, $params) = @_;
 
 	$self->_getUserContext( sub {
-		my ($user, $license, $csrf, $mode) = @_;
+		my ($tokens, $mode) = @_;
+		return $cb->() unless $tokens;
 
-		$cb->() unless $user;
-
-#$log->error("THAT WHAT WE HAVE $user, $license, $csrf");
+#$log->error("THAT WHAT WE HAVE ", Data::Dump::dump($tokens));
 		my $args = {
 			method => 'song.getListData',
-			apiToken => $csrf,
+			apiToken => $tokens->{csrf},
 			contentType => 'application/json',
 			cookies => $mode,
 		};
@@ -421,7 +464,7 @@ sub getTrackUrl {
 
 			return $cb->() unless @trackTokens;
 
-			$self->_getProviders( $cb, $license, $params->{quality}, \@trackTokens, \@trackIds );
+			$self->_getProviders( $cb, $tokens->{license}, $params->{quality}, \@trackTokens, \@trackIds );
 		}, $args, $content);
 	} );
 }
@@ -461,10 +504,10 @@ sub _getProviders {
 		sub {
 			my $result = eval { from_json(shift->content) };
 			my $tracks = [];
-			
+
 			$@ && $log->error($@);
 			$log->debug(Data::Dump::dump($result)) if $@ || (main::DEBUGLOG && $log->is_debug);
-			
+
 			# stitch back the track Ids whch should be in same array order...
 			foreach my $i (0...$#{$result->{data}} ) {
 				my $media = $result->{data}->[$i]->{media};
@@ -484,7 +527,7 @@ sub _getProviders {
 			my ($http, $error) = @_;
 			$log->warn("Error: $error");
 			main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($http));
-			$cb->([]);
+			$cb->();
 		},
 	)->post(UURL, ContentType => 'application/json', $content);
 }
@@ -492,23 +535,14 @@ sub _getProviders {
 sub _getUserContext {
 	my ($self, $cb) = @_;
 
-	$self->_getArl( sub {
-		my $arl = shift;
-
-		if (!$arl) {
-			$log->warn("ARL token is required, can't play");
-			$cb->();
-		}
-
-		$self->_getTokens( $cb, { arl => $arl } );
-	} );
-}
-
-sub _getArl {
-	my ($self, $cb) = @_;
 	my $accounts = $prefs->get('accounts') || {};
 	my $profile  = $accounts->{$self->userId};
-	$cb->($profile->{status} == 2 ? $profile->{arl}: '');
+	my $arl = $profile->{arl};
+
+	return $self->_getTokens( $cb, { arl => $arl } ) if $arl && $profile->{status} == 2;
+
+	$log->warn("ARL token is required, can't play");
+	$cb->();
 }
 
 sub _getTokens {
@@ -521,12 +555,14 @@ sub _getTokens {
 
 	$self->_ajax( sub {
 		my $result = shift;
-		my $userToken = $result->{results}->{USER_TOKEN};
-		my $licenseToken = $result->{results}->{USER}->{OPTIONS}->{license_token};
-		my $csrfToken = $result->{results}->{checkForm};
-		my $expiry = $result->{results}->{USER}->{OPTIONS}->{expiration_timestamp};
+		my $tokens = {
+			user => $result->{results}->{USER_TOKEN},
+			license => $result->{results}->{USER}->{OPTIONS}->{license_token},
+			csrf => $result->{results}->{checkForm},
+			expiration => $result->{results}->{USER}->{OPTIONS}->{expiration_timestamp},
+		};
 
-		$cb->($userToken, $licenseToken, $csrfToken, $mode);
+		$cb->($tokens, $mode);
 	}, $params );
 }
 
@@ -618,7 +654,8 @@ sub _get {
 		$_ !~ /^_/
 	} keys %$params);
 
-	main::INFOLOG && $log->is_info && $log->info("Using cache key '$cacheKey'") unless $noCache;
+	my $trace = $cacheKey =~ s/(:access_token)\w+/${1}***/r;
+	main::INFOLOG && $log->is_info && $log->info("Using cache key '$trace'") unless $noCache;
 
 	my $maxLimit = 0;
 	if ($params->{limit} > DEFAULT_LIMIT) {
@@ -627,15 +664,16 @@ sub _get {
 	}
 
 	my $query = complex_to_query($params);
+	my $trace = $query =~ s/(access_token=)\w+/${1}***/r;
 
 	if (!$noCache && (my $cached = $cache->get($cacheKey))) {
-		main::INFOLOG && $log->is_info && $log->info("Returning cached data for $url?$query");
+		main::INFOLOG && $log->is_info && $log->info("Returning cached data for $url?$trace");
 		main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($cached));
 
 		return $cb->($cached);
 	}
 
-	main::INFOLOG && $log->is_info && $log->info("Getting $url?$query");
+	main::INFOLOG && $log->is_info && $log->info("Getting $url?$trace");
 
 	Slim::Networking::SimpleAsyncHTTP->new(
 		sub {
