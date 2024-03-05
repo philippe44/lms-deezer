@@ -62,6 +62,12 @@ sub initPlugin {
 		func  => \&albumInfoMenu,
 	) );
 
+#  |requires Client
+#  |  |is a Query
+#  |  |  |has Tags
+#  |  |  |  |Function to call
+	Slim::Control::Request::addDispatch( [ 'deezer_favs', 'items', '_index', '_quantity' ],	[ 1, 1, 1, \&menuInfo ]	);
+
 =comment
 	Slim::Menu::GlobalSearch->registerInfoProvider( deezer => (
 		func => sub {
@@ -74,7 +80,77 @@ sub initPlugin {
 		},
 	) );
 =cut
+}
 
+sub menuInfo {
+	my $request = shift;
+	my $client = $request->client;
+	
+	# be careful that type must be artistS|albumS|playlistS|trackS
+	my $type = $request->getParam('type');
+	my $id = $request->getParam('id');
+	my $handler = getAPIHandler($client);
+	
+	$request->addParam('_index', 0);
+	$request->addParam('_quantity', 10);
+	
+	$handler->getFavorites( sub {
+		my $favorites = shift;
+		
+		my $action = (grep { $type =~ /$_->{type}/ && $_->{id} == $id } @$favorites) ? 'remove' : 'add'; 
+		my $title = $action eq 'remove' ? cstring($client, 'PLUGIN_FAVORITES_REMOVE') : cstring($client, 'PLUGIN_FAVORITES_SAVE');
+					
+		my $item;
+	
+		if ($request->getParam('menu')) {
+			$item = {
+				type => 'link',
+				name => $title,
+				isContextMenu => 1,
+				refresh => 1,
+				jive => {
+					actions => {
+						go => {
+							player => 0,
+							#cmd    => [ 'deezer_favs', $menuAction ],
+						}
+					},
+					nextWindow => 'parent'
+				},
+			};
+		} else {
+			$item = {
+				type => 'link',
+				name => $title,
+				url => sub {
+					my ($client, $cb) = @_;
+					$handler->updateFavorite( sub {
+						$cb->({
+							items => [{
+								type => 'text',
+								name => cstring($client, 'COMPLETE'),
+							}],
+						});
+					}, $action, $type, $id );				
+				},
+			};
+		}
+		
+		my $items = [ $item ];
+
+=comment	
+		# add some other stuff here
+		push @$items, {
+			type => 'text',
+			name => '',
+		};
+=cut	
+		Slim::Control::XMLBrowser::cliQuery('deezer_favs', {
+			name => $request->getParam('title'),
+			items => $items,
+		}, $request);
+	
+	}, $type, 1 );
 }
 
 sub postinitPlugin {
@@ -296,8 +372,10 @@ sub getArtistAlbums {
 
 	getAPIHandler($client)->artistAlbums(sub {
 		my $items = _renderAlbums(@_);
+
 		$cb->( {
-			items => $items
+			items => $items,
+			# the action can be there or in the sub-item as an itemActions
 		} );
 	}, $params->{id});
 }
@@ -505,6 +583,13 @@ sub _renderPlaylist {
 		line2 => $item->{user}->{name},
 		favorites_url => 'deezer://playlist:' . $item->{id},
 		type => 'playlist',
+		# don't set 'play' for now as it might be dangerous to let user delete playlists here
+		itemActions => {
+			info => {
+				command   => ['deezer_favs', 'items'],
+				fixedParams => { type => 'playlists', id => $item->{id}, title => $item->{title} },
+			},
+		},
 		url => \&getPlaylist,
 		image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder'),
 		passthrough => [ { id => $item->{id} } ],
@@ -529,8 +614,17 @@ sub _renderAlbum {
 		name => $title,
 		line1 => $item->{title},
 		line2 => $item->{artist}->{name},
-		favorites_url => 'deezer://album:' . $item->{id},
 		type => 'playlist',
+		# we need the 'play' item for the actions to be visible...
+		#favorites_url => 'deezer://album:' . $item->{id},
+		play => 'deezer://album:' . $item->{id},
+		itemActions => {
+			info => {
+				command   => ['deezer_favs', 'items'],
+				fixedParams => { type => 'albums', id => $item->{id}, title => $title },
+				#variables => [ 'url', 'url', 'name', 'name' ],
+			},
+		},
 		url => \&getAlbum,
 		image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder'),
 		passthrough => [{
@@ -594,8 +688,8 @@ sub _renderArtist {
 	my $items = [ {
 		name => cstring($client, 'PLUGIN_DEEZER_TOP_TRACKS'),
 		favorites_url => 'deezer://artist:' . $item->{id},
-		favorites_title => "$item->{name}'s top tracks",
-		type => 'playlist',
+		favorites_title => "$item->{name} - " . cstring($client, 'PLUGIN_DEEZER_TOP_TRACKS'),
+		type => 'playlist',	
 		url => \&getArtistTopTracks,
 		image => 'plugins/Deezer/html/charts.png',
 		passthrough => [{ id => $item->{id} }],
@@ -608,7 +702,7 @@ sub _renderArtist {
 		name => cstring($client, 'RADIO'),
 		on_select => 'play',
 		#favorites_url => 'deezer://artist-radio:' . $item->{id},
-		favorites_title => "$item->{name}'s radio",
+		favorites_title => "$item->{name} - " . cstring($client, 'RADIO'),
 		play => "deezer://artist/$item->{id}/radio.dzr",
 		url => "deezer://artist/$item->{id}/radio.dzr",
 		image => 'plugins/Deezer/html/smart_radio.png',
@@ -623,6 +717,12 @@ sub _renderArtist {
 		name => $item->{name},
 		type => 'outline',
 		items => $items,
+		itemActions => {
+			info => {
+				command   => ['deezer_favs', 'items'],
+				fixedParams => { type => 'artists', id => $item->{id}, title => $item->{name} },
+			},
+		},
 		image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder'),
 	};
 }

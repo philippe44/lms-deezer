@@ -13,6 +13,7 @@ use List::Util qw(min);
 use Digest::MD5 qw(md5_hex);
 
 use Slim::Networking::SimpleAsyncHTTP;
+use Slim::Networking::Async::HTTP;
 use Slim::Utils::Cache;
 use Slim::Utils::Log;
 use Slim::Utils::Prefs;
@@ -393,7 +394,7 @@ sub getFavorites {
 			}
 			else {
 				main::INFOLOG && $log->is_info && $log->info("Collection of type '$type' has changed - updating");
-				return $lookupSub($cb) unless $type =~ /playlists/;
+				return $lookupSub->($cb) unless $type =~ /playlists/;
 
 				# need to invalidate playlists that are actually updated (and correct TZ)
 				my $timestamp = $cached->{timestamp} + $tzOffset;
@@ -439,6 +440,44 @@ sub getCollectionFingerprint {
 	});
 }
 
+sub updateFavorite {
+	my ($self, $cb, $action, $type, $id) = @_;
+	
+	my $accounts = $prefs->get('accounts') || {};
+	my $profile  = $accounts->{$self->userId};
+	my $access_token = $profile->{token} if $profile;
+	
+	# well... we have a trailing 's' (I know this is hacky... and bad)
+	my $item = substr($type, 0, -1);
+
+	# need everything to update the library
+	return $cb() unless $action && $type && $id && $access_token;
+	
+	my $query = complex_to_query( {
+		$item . '_id' => $id,
+		access_token => $access_token,	
+	} );
+
+	my $method = ($action =~ /add/) ? 'POST' : 'DELETE';	
+	my $trace = $query =~ s/(access_token=)\w+/${1}***/r;
+	main::INFOLOG && $log->is_info && $log->info(uc($method) . " /user/me/$type?$trace");
+	
+	# no DELETE method in SimpleAsync
+	my $http = Slim::Networking::Async::HTTP->new;
+	my $request = HTTP::Request->new( $method => BURL . "/user/me/$type?$query" );
+	$request->header( 'Content-Length' => 0);
+	$http->send_request( {
+		request => $request,
+		onBody  => $cb,
+		onError => sub {
+			my ($http, $error) = @_;
+			$log->warn("Error: $error");
+			main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($http));
+			$cb->();
+		}
+	} );
+}
+	
 sub getTrackUrl {
 	my ($self, $cb, $ids, $params) = @_;
 
@@ -529,7 +568,7 @@ sub _getProviders {
 			main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($http));
 			$cb->();
 		},
-	)->post(UURL, ContentType => 'application/json', $content);
+	)->post(UURL, 'Content-Type' => 'application/json', $content);
 }
 
 sub _getUserContext {
@@ -541,7 +580,7 @@ sub _getUserContext {
 
 	return $self->_getTokens( $cb, { arl => $arl } ) if $arl && $profile->{status} == 2;
 
-	$log->warn("ARL token is required, can't play");
+	$log->error("ARL token is required, can't play");
 	$cb->();
 }
 
@@ -588,7 +627,7 @@ sub _getSession {
 sub _ajax {
 	my ($self, $cb, $params, $content) = @_;
 
-	my %headers = ( ContentType => $params->{contentType} || 'application/x-www-form-urlencoded' );
+	my %headers = ( 'Content-Type' => $params->{contentType} || 'application/x-www-form-urlencoded' );
 	my $cookies = $params->{cookies};
 	$headers{Cookie} = join ' ', map { "$_=$cookies->{$_}" } keys %$cookies if $cookies;
 
