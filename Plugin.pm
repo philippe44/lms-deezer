@@ -67,6 +67,7 @@ sub initPlugin {
 #  |  |  |has Tags
 #  |  |  |  |Function to call
 	Slim::Control::Request::addDispatch( [ 'deezer_favs', 'items', '_index', '_quantity' ],	[ 1, 1, 1, \&menuInfo ]	);
+	Slim::Control::Request::addDispatch( [ 'deezer_favs', 'jive' ],	[ 1, 1, 1, \&menuInfo ]	);
 
 =comment
 	Slim::Menu::GlobalSearch->registerInfoProvider( deezer => (
@@ -86,10 +87,18 @@ sub menuInfo {
 	my $request = shift;
 	my $client = $request->client;
 	
+	$log->error(Data::Dump::dump($request));
+
 	# be careful that type must be artistS|albumS|playlistS|trackS
 	my $type = $request->getParam('type');
 	my $id = $request->getParam('id');
 	my $handler = getAPIHandler($client);
+
+	if ($request->getRequest(1) =~ /jive/) {
+		my $action = $request->getParam('action');
+		$handler->updateFavorite( sub { }, $action, $type, $id );				
+		return;
+	}
 	
 	$request->addParam('_index', 0);
 	$request->addParam('_quantity', 10);
@@ -112,7 +121,12 @@ sub menuInfo {
 					actions => {
 						go => {
 							player => 0,
-							#cmd    => [ 'deezer_favs', $menuAction ],
+							cmd    => [ 'deezer_favs', 'jive' ],
+							params => {
+								type => $type,
+								id => $id,
+								action => $action,
+							},
 						}
 					},
 					nextWindow => 'parent'
