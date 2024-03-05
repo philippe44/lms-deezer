@@ -581,9 +581,9 @@ sub _renderPlaylist {
 		name => $item->{title},
 		line1 => $item->{title},
 		line2 => $item->{user}->{name},
-		favorites_url => 'deezer://playlist:' . $item->{id},
+		#favorites_url => 'deezer://playlist:' . $item->{id},
+		play => 'deezer://playlist:' . $item->{id},
 		type => 'playlist',
-		# don't set 'play' for now as it might be dangerous to let user delete playlists here
 		itemActions => {
 			info => {
 				command   => ['deezer_favs', 'items'],
