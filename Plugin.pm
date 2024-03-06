@@ -86,7 +86,7 @@ sub initPlugin {
 sub menuInfo {
 	my $request = shift;
 	my $client = $request->client;
-	
+
 	$log->error(Data::Dump::dump($request));
 
 	# be careful that type must be artistS|albumS|playlistS|trackS
@@ -96,21 +96,21 @@ sub menuInfo {
 
 	if ($request->getRequest(1) =~ /jive/) {
 		my $action = $request->getParam('action');
-		$handler->updateFavorite( sub { }, $action, $type, $id );				
+		$handler->updateFavorite( sub { }, $action, $type, $id );
 		return;
 	}
-	
+
 	$request->addParam('_index', 0);
 	$request->addParam('_quantity', 10);
-	
+
 	$handler->getFavorites( sub {
 		my $favorites = shift;
-		
-		my $action = (grep { $type =~ /$_->{type}/ && $_->{id} == $id } @$favorites) ? 'remove' : 'add'; 
+
+		my $action = (grep { $type =~ /$_->{type}/ && $_->{id} == $id } @$favorites) ? 'remove' : 'add';
 		my $title = $action eq 'remove' ? cstring($client, 'PLUGIN_FAVORITES_REMOVE') : cstring($client, 'PLUGIN_FAVORITES_SAVE');
-					
+
 		my $item;
-	
+
 		if ($request->getParam('menu')) {
 			$item = {
 				type => 'link',
@@ -145,25 +145,25 @@ sub menuInfo {
 								name => cstring($client, 'COMPLETE'),
 							}],
 						});
-					}, $action, $type, $id );				
+					}, $action, $type, $id );
 				},
 			};
 		}
-		
+
 		my $items = [ $item ];
 
-=comment	
+=comment
 		# add some other stuff here
 		push @$items, {
 			type => 'text',
 			name => '',
 		};
-=cut	
+=cut
 		Slim::Control::XMLBrowser::cliQuery('deezer_favs', {
 			name => $request->getParam('title'),
 			items => $items,
 		}, $request);
-	
+
 	}, $type, 1 );
 }
 
@@ -240,8 +240,8 @@ sub handleFeed {
 		items => [{
 			name => cstring($client, 'PLUGIN_DEEZER_FLOW'),
 			image => 'plugins/Deezer/html/flow.png',
-			on_select => 'play',			
-			url => 'deezer://user/me/flow.dzr',	
+			on_select => 'play',
+			url => 'deezer://user/me/flow.dzr',
 			play => 'deezer://user/me/flow.dzr',
 		},{
 			name => cstring($client, 'GENRES'),
@@ -442,7 +442,7 @@ sub getFlow {
 
 	my $mode = $params->{mode} =~ /genre/ ? 'genre' : 'mood';
 	my @categories = $mode eq 'genre' ?
-					( 'pop', 'rap', 'rock', 'alternative', 'kpop', 'jazz', 'classical', 
+					( 'pop', 'rap', 'rock', 'alternative', 'kpop', 'jazz', 'classical',
 					  'chanson', 'reggae', 'latin', 'soul', 'variete', 'lofi', 'rnb',
 					  'danceedm' ) :
 					( 'motivation', 'party', 'chill', 'melancholy', 'you_and_me', 'focus');
@@ -450,6 +450,7 @@ sub getFlow {
 	my $items = [ map {
 		{
 			name => cstring($client, 'PLUGIN_DEEZER_' . uc($_)),
+			on_select => 'play',
 			play => "deezer://$mode:" . $_ . '.flow',
 			url => "deezer://$mode:" . $_ . '.flow',
 			#favorites_url => "deezer://$mode:' . $_ . '.flow',
@@ -655,6 +656,7 @@ sub _renderRadio {
 		name => $item->{title},
 		line1 => $item->{description},
 		#favorites_url => 'deezer://radio:' . $item->{id},
+		on_select => 'play',
 		play => "deezer://radio/$item->{id}/tracks.dzr",
 		url => "deezer://radio/$item->{id}/tracks.dzr",
 		image => Plugins::Deezer::API->getImageUrl($item),
@@ -699,11 +701,14 @@ sub _renderArtists {
 sub _renderArtist {
 	my ($client, $item) = @_;
 
+	my $image = Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder');
+
 	my $items = [ {
 		name => cstring($client, 'PLUGIN_DEEZER_TOP_TRACKS'),
 		favorites_url => 'deezer://artist:' . $item->{id},
 		favorites_title => "$item->{name} - " . cstring($client, 'PLUGIN_DEEZER_TOP_TRACKS'),
-		type => 'playlist',	
+		favorites_icon => $image,
+		type => 'playlist',
 		url => \&getArtistTopTracks,
 		image => 'plugins/Deezer/html/charts.png',
 		passthrough => [{ id => $item->{id} }],
@@ -717,6 +722,7 @@ sub _renderArtist {
 		on_select => 'play',
 		#favorites_url => 'deezer://artist-radio:' . $item->{id},
 		favorites_title => "$item->{name} - " . cstring($client, 'RADIO'),
+		favorites_icon => $image,
 		play => "deezer://artist/$item->{id}/radio.dzr",
 		url => "deezer://artist/$item->{id}/radio.dzr",
 		image => 'plugins/Deezer/html/smart_radio.png',
@@ -737,7 +743,7 @@ sub _renderArtist {
 				fixedParams => { type => 'artists', id => $item->{id}, title => $item->{name} },
 			},
 		},
-		image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder'),
+		image => $image,
 	};
 }
 
