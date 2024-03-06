@@ -29,6 +29,7 @@ use Plugins::Deezer::API qw(BURL GURL UURL DEFAULT_LIMIT MAX_LIMIT DEFAULT_TTL U
 	__PACKAGE__->mk_accessor( rw => qw(
 		client
 		userId
+		updated
 	) );
 }
 
@@ -354,6 +355,10 @@ sub getFavorites {
 
 	my $userId = $self->userId || return $cb->();
 	my $cacheKey = "deezer_favs_$type:$userId";
+	
+	# we need to re-load if we have been updated
+	$drill &&= !$self->updated;
+	$self->updated(0);
 
 	my $lookupSub = sub {
 		my $scb = shift;
@@ -396,7 +401,7 @@ sub getFavorites {
 				main::INFOLOG && $log->is_info && $log->info("Collection of type '$type' has changed - updating");
 				return $lookupSub->($cb) unless $type =~ /playlists/;
 
-				# need to invalidate playlists that are actually updated (and correct TZ)
+				# need to invalidate playlists that are actually updated (and correct TZ, see below)
 				my $timestamp = $cached->{timestamp} + $tzOffset;
 
 				$lookupSub->( sub {
@@ -427,8 +432,8 @@ sub getCollectionFingerprint {
 
 		my $fingerprint = {
 			checksum => $result->{checksum},
-			# well, believe it or not the time recorded by Deezer includes TZ...
-			time => $result->{data}->[0]->{$sort} - $tzOffset,
+			# well, believe it or not the time recorded by Deezer includes TZ for playlist ONLY...
+			time => $result->{data}->[0]->{$sort} - ($type =~ /playlists/ ? $tzOffset : 0),
 			total => $result->{total},
 		} if $result->{data};
 
@@ -452,6 +457,9 @@ sub updateFavorite {
 
 	# need everything to update the library
 	return $cb() unless $action && $type && $id && $access_token;
+	
+	# make sure we'll force an update check next time
+	$self->updated(1);
 	
 	my $query = complex_to_query( {
 		$item . '_id' => $id,

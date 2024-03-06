@@ -66,8 +66,8 @@ sub initPlugin {
 #  |  |is a Query
 #  |  |  |has Tags
 #  |  |  |  |Function to call
-	Slim::Control::Request::addDispatch( [ 'deezer_favs', 'items', '_index', '_quantity' ],	[ 1, 1, 1, \&menuInfo ]	);
-	Slim::Control::Request::addDispatch( [ 'deezer_favs', 'jive' ],	[ 1, 1, 1, \&menuInfo ]	);
+	Slim::Control::Request::addDispatch( [ 'deezer_favs', 'items', '_index', '_quantity' ],	[ 1, 1, 1, \&menuMore ]	);
+	Slim::Control::Request::addDispatch( [ 'deezer_favs', 'jive' ],	[ 1, 1, 1, \&menuMore ]	);
 
 =comment
 	Slim::Menu::GlobalSearch->registerInfoProvider( deezer => (
@@ -83,7 +83,7 @@ sub initPlugin {
 =cut
 }
 
-sub menuInfo {
+sub menuMore {
 	my $request = shift;
 	my $client = $request->client;
 
@@ -106,7 +106,7 @@ sub menuInfo {
 	$handler->getFavorites( sub {
 		my $favorites = shift;
 
-		my $action = (grep { $type =~ /$_->{type}/ && $_->{id} == $id } @$favorites) ? 'remove' : 'add';
+		my $action = (grep { $_->{id} == $id && ($type =~ /$_->{type}/ || !$_->{type}) } @$favorites) ? 'remove' : 'add';
 		my $title = $action eq 'remove' ? cstring($client, 'PLUGIN_FAVORITES_REMOVE') : cstring($client, 'PLUGIN_FAVORITES_SAVE');
 
 		my $item;
@@ -687,6 +687,12 @@ sub _renderTrack {
 		play => $url,
 		playall => 1,
 		image => $item->{cover},
+		itemActions => {
+			info => {
+				command   => ['deezer_favs', 'items'],
+				fixedParams => { type => 'tracks', id => $item->{id}, title => $item->{title} },
+			},
+		},
 	};
 }
 
