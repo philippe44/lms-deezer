@@ -349,17 +349,19 @@ sub playlist {
 # that their content itself has changed within DEFAULT_TTL
 
 sub getFavorites {
-	my ($self, $cb, $type, $drill) = @_;
+	my ($self, $cb, $type, $refresh) = @_;
 
 	return $cb->() unless $type;
 
 	my $userId = $self->userId || return $cb->();
 	my $cacheKey = "deezer_favs_$type:$userId";
 	
-	# we need to re-load if we have been updated
-	$drill &&= !$self->updated;
-	$self->updated(0);
-
+	# verify if that type has been updated and force refresh
+	if ((my $updated = $self->updated) =~ /$type:/) {
+		$self->updated($updated =~ s/$type://r);
+		$refresh = 1;
+	}
+	
 	my $lookupSub = sub {
 		my $scb = shift;
 		$self->_get("/user/me/$type", sub {
@@ -386,8 +388,8 @@ sub getFavorites {
 
 	# use cached data unless the collection has changed
 	if ($cached && ref $cached->{items}) {
-		# don't bother verifying checksum when drilling down
-		return $cb->($cached->{items}) if $drill;
+		# don't bother verifying checksum when not asked (e.g. drilling down)
+		return $cb->($cached->{items}) unless $refresh;
 
 		$self->getCollectionFingerprint(sub {
 			my $fingerprint = shift;
@@ -459,7 +461,8 @@ sub updateFavorite {
 	return $cb() unless $action && $type && $id && $access_token;
 	
 	# make sure we'll force an update check next time
-	$self->updated(1);
+	my $updated = $self->updated;
+	$self->updated($updated . "$type:") unless $updated =~ /$type/;
 	
 	my $query = complex_to_query( {
 		$item . '_id' => $id,

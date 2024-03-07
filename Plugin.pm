@@ -164,7 +164,7 @@ sub menuMore {
 			items => $items,
 		}, $request);
 
-	}, $type, 1 );
+	}, $type );
 }
 
 sub postinitPlugin {
@@ -378,7 +378,7 @@ sub getFavorites {
 		$cb->( {
 			items => $items
 		} );
-	}, $params->{type}, $args->{quantity} == 1 );
+	}, $params->{type}, $args->{quantity} != 1 );
 }
 
 sub getArtistAlbums {
