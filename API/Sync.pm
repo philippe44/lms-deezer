@@ -2,7 +2,6 @@ package Plugins::Deezer::API::Sync;
 
 use strict;
 use Data::URIEncode qw(complex_to_query);
-use Date::Parse qw(str2time);
 use JSON::XS::VersionOneAndTwo;
 use List::Util qw(min);
 
@@ -25,7 +24,7 @@ sub getFavorites {
 
 	my $items = [ map {
 		my $item = $_;
-		$item->{added} = str2time(delete $item->{time_add}) if $item->{time_add};
+		$item->{added} = delete $item->{time_add} if $item->{time_add};
 		$item->{cover} = Plugins::Deezer::API->getImageUrl($item);
 
 		foreach (qw(adSupportedStreamReady allowStreaming audioModes audioQuality copyright djReady explicit
