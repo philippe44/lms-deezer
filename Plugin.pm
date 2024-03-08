@@ -12,6 +12,7 @@ use Slim::Utils::Strings qw(cstring);
 use Plugins::Deezer::API::Auth;
 use Plugins::Deezer::API::Async;
 use Plugins::Deezer::ProtocolHandler;
+use Plugins::Deezer::Custom;
 
 my $log = Slim::Utils::Log->addLogCategory({
 	'category'    => 'plugin.deezer',
@@ -87,7 +88,6 @@ sub menuMore {
 	my $request = shift;
 	my $client = $request->client;
 
-	$log->error(Data::Dump::dump($request));
 
 	# be careful that type must be artistS|albumS|playlistS|trackS
 	my $type = $request->getParam('type');
@@ -231,8 +231,12 @@ sub handleFeed {
 	}
 =cut
 
-
 	my $items = [ {
+		name => cstring($client, 'HOME'),
+		image => 'plugins/Deezer/html/home.png',
+		type => 'link',
+		url => \&Plugins::Deezer::Custom::getHome,
+	}, {
 		name => cstring($client, 'PLUGIN_DEEZER_FLOW'),
 		image => 'plugins/Deezer/html/flow.png',
 		play => 'deezer://user/me/flow.dzr',
@@ -740,7 +744,7 @@ sub _renderArtist {
 	} ];
 
 	return {
-		name => $item->{name},
+		name => $item->{name} || $item->{title},
 		type => 'outline',
 		items => $items,
 		itemActions => {
@@ -933,8 +937,6 @@ sub artistInfoMenu {
 	my ($client, $url, $artist, $remoteMeta) = @_;
 
 	my $artist  = ($remoteMeta && $remoteMeta->{artist}) || ($artist && $artist->name);
-	$log->error(Data::Dump::dump($artist, $remoteMeta));
-
 	my $query = 'artist:' . "\"$artist\" ";
 	main::INFOLOG && $log->is_info && $log->info("Getting info with query $query");
 

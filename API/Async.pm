@@ -11,6 +11,7 @@ use MIME::Base64 qw(encode_base64);
 use JSON::XS::VersionOneAndTwo;
 use List::Util qw(min);
 use Digest::MD5 qw(md5_hex);
+use URI::Escape qw(uri_escape);
 
 use Slim::Networking::SimpleAsyncHTTP;
 use Slim::Networking::Async::HTTP;
@@ -62,8 +63,8 @@ sub refreshArl {
 
 		my $args = {
 			method => 'user.getArl',
-			apiToken => $tokens->{csrf},
-			cookies => $mode,
+			api_token => $tokens->{csrf},
+			_cookies => $mode,
 		};
 
 		__PACKAGE__->_ajax( sub {
@@ -217,8 +218,8 @@ sub flowTracks {
 
 		my $args = {
 			method => 'radio.getUserRadio',
-			apiToken => $tokens->{csrf},
-			contentType => 'application/json',
+			api_token => $tokens->{csrf},
+			_contentType => 'application/json',
 		};
 
 		my $content = encode_json( {
@@ -355,13 +356,13 @@ sub getFavorites {
 
 	my $userId = $self->userId || return $cb->();
 	my $cacheKey = "deezer_favs_$type:$userId";
-	
+
 	# verify if that type has been updated and force refresh
 	if ((my $updated = $self->updated) =~ /$type:/) {
 		$self->updated($updated =~ s/$type://r);
 		$refresh = 1;
 	}
-	
+
 	my $lookupSub = sub {
 		my $scb = shift;
 		$self->_get("/user/me/$type", sub {
@@ -449,30 +450,30 @@ sub getCollectionFingerprint {
 
 sub updateFavorite {
 	my ($self, $cb, $action, $type, $id) = @_;
-	
+
 	my $accounts = $prefs->get('accounts') || {};
 	my $profile  = $accounts->{$self->userId};
 	my $access_token = $profile->{token} if $profile;
-	
+
 	# well... we have a trailing 's' (I know this is hacky... and bad)
 	my $item = substr($type, 0, -1);
 
 	# need everything to update the library
 	return $cb() unless $action && $type && $id && $access_token;
-	
+
 	# make sure we'll force an update check next time
 	my $updated = $self->updated;
 	$self->updated($updated . "$type:") unless $updated =~ /$type/;
-	
+
 	my $query = complex_to_query( {
 		$item . '_id' => $id,
-		access_token => $access_token,	
+		access_token => $access_token,
 	} );
 
-	my $method = ($action =~ /add/) ? 'POST' : 'DELETE';	
+	my $method = ($action =~ /add/) ? 'POST' : 'DELETE';
 	my $trace = $query =~ s/(access_token=)\w+/${1}***/r;
 	main::INFOLOG && $log->is_info && $log->info(uc($method) . " /user/me/$type?$trace");
-	
+
 	# no DELETE method in SimpleAsync
 	my $http = Slim::Networking::Async::HTTP->new;
 	my $request = HTTP::Request->new( $method => BURL . "/user/me/$type?$query" );
@@ -488,7 +489,7 @@ sub updateFavorite {
 		}
 	} );
 }
-	
+
 sub getTrackUrl {
 	my ($self, $cb, $ids, $params) = @_;
 
@@ -499,9 +500,9 @@ sub getTrackUrl {
 #$log->error("THAT WHAT WE HAVE ", Data::Dump::dump($tokens));
 		my $args = {
 			method => 'song.getListData',
-			apiToken => $tokens->{csrf},
-			contentType => 'application/json',
-			cookies => $mode,
+			api_token => $tokens->{csrf},
+			_contentType => 'application/json',
+			_cookies => $mode,
 		};
 
 		my $content = encode_json( { sng_ids => $ids } );
@@ -600,7 +601,7 @@ sub _getTokens {
 
 	my $params = {
 		method => 'deezer.getUserData',
-		cookies => $mode,
+		_cookies => $mode,
 	};
 
 	$self->_ajax( sub {
@@ -638,15 +639,16 @@ sub _getSession {
 sub _ajax {
 	my ($self, $cb, $params, $content) = @_;
 
-	my %headers = ( 'Content-Type' => $params->{contentType} || 'application/x-www-form-urlencoded' );
-	my $cookies = $params->{cookies};
+	my $cookies = delete $params->{_cookies};
+	my %headers = ( 'Content-Type' => delete $params->{_contentType} || 'application/x-www-form-urlencoded' );
 	$headers{Cookie} = join ' ', map { "$_=$cookies->{$_}" } keys %$cookies if $cookies;
 
+	$params->{api_token} ||= 'null';
+
 	my $query = complex_to_query( {
-		method => $params->{method},
+		%$params,
 		input => '3',
 		api_version => '1.0',
-		api_token => $params->{apiToken} || 'null',
 	} );
 
 	my $method = $content ? 'post' : 'get';
