@@ -114,17 +114,6 @@ sub _getTarget {
 
 #----------------------------- ASYNC domain -------------------------------
 
-my $home = {
-		PAGE => 'home',
-		VERSION => '2.5',
-		SUPPORT => {
-			'horizontal-grid' => ['album','artist','artistLineUp','channel','livestream','flow','playlist','radio','show','smarttracklist','track'],
-			'horizontal-list' => ['track','song'],
-			'long-card-horizontal-grid' => ['album','artist','artistLineUp','channel','livestream','flow','playlist','radio','show','smarttracklist','track'],
-		},
-		LANG => 'en',
-};
-
 sub _home {
 	my ($self, $cb) = @_;
 
@@ -221,7 +210,7 @@ sub _userQuery {
 
 			$cache->set($cacheKey, $results, $ttl) if $results;
 			$cb->($results);
-		}, $args, encode_json($content) );
+		}, $args, encode_json($content || {}) );
 	} );
 }
 
