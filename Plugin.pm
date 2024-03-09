@@ -12,6 +12,7 @@ use Slim::Utils::Strings qw(cstring);
 use Plugins::Deezer::API::Auth;
 use Plugins::Deezer::API::Async;
 use Plugins::Deezer::ProtocolHandler;
+use Plugins::Deezer::PodcastProtocolHandler;
 use Plugins::Deezer::Custom;
 
 my $log = Slim::Utils::Log->addLogCategory({
@@ -39,6 +40,7 @@ sub initPlugin {
 	}
 
 	Slim::Player::ProtocolHandlers->registerHandler('deezer', 'Plugins::Deezer::ProtocolHandler');
+	Slim::Player::ProtocolHandlers->registerHandler('deezerpodcast', 'Plugins::Deezer::PodcastProtocolHandler');
 	Slim::Music::Import->addImporter('Plugins::Deezer::Importer', { use => 1 });
 
 	$class->SUPER::initPlugin(
@@ -222,15 +224,6 @@ sub handleFeed {
 		});
 	}
 
-=comment
-	{
-		name => cstring($client, 'PLUGIN_PODCAST'),
-		type  => 'link',
-		url   => \&getGenreItems,
-		passthrough => [ { id => $item->{id}, type => 'podcasts' } ],
-	}
-=cut
-
 	my $items = [ {
 		name => cstring($client, 'HOME'),
 		image => 'plugins/Deezer/html/home.png',
@@ -284,6 +277,12 @@ sub handleFeed {
 		type => 'link',
 		url => \&getFavorites,
 		passthrough => [{ type => 'artists' }],
+	# },{
+		# name => cstring($client, 'PODCASTS'),
+		# image => 'plugins/Deezer/html/podcast.png',
+		# type => 'link',
+		# url => \&getFavorites,
+		# passthrough => [{ type => 'podcasts' }],
 	},{
 		name => cstring($client, 'GENRES'),
 		image => 'html/images/genres.png',
@@ -299,36 +298,46 @@ sub handleFeed {
 		image => 'plugins/Deezer/html/charts.png',
 		type => 'link',
 		url => \&getCompound,
-		passthrough => [ { path => 'chart' } ],
+		passthrough => [{ path => 'chart' }],
 	},{
+		name => cstring($client, 'PLUGIN_PODCAST'),
+		image => 'plugins/Deezer/html/rss.png',
+		type  => 'link',
+		url   => \&getPodcasts,
+	}, {
 		name  => cstring($client, 'SEARCH'),
 		image => 'html/images/search.png',
 		type => 'outline',
-		items => [{
+		items => [ {
 			name => cstring($client, 'PLAYLISTS'),
 			type  => 'search',
 			url   => \&search,
 			# image => 'html/images/playlists.png',
-			passthrough => [ { type => 'playlist'	} ],
+			passthrough => [{ type => 'playlist' }],
 		},{
 			name => cstring($client, 'ARTISTS'),
 			type  => 'search',
 			url   => \&search,
 			# image => 'html/images/artists.png',
-			passthrough => [ { type => 'artist' } ],
+			passthrough => [{ type => 'artist' }],
 		},{
 			name => cstring($client, 'ALBUMS'),
 			type  => 'search',
 			url   => \&search,
 			# image => 'html/images/albums.png',
-			passthrough => [ { type => 'album' } ],
+			passthrough => [{ type => 'album' }],
 		},{
 			name => cstring($client, 'SONGS'),
 			type  => 'search',
 			url   => \&search,
 			# image => 'html/images/playall.png',
-			passthrough => [ { type => 'track' } ],
-		}]
+			passthrough => [{ type => 'track' }],
+		},{
+			name => cstring($client, 'PLUGIN_PODCAST'),
+			type  => 'search',
+			url   => \&search,
+			passthrough => [{ type => 'podcast' }],
+		} ],
 	} ];
 
 	if ($client && keys %{$prefs->get('accounts') || {}} > 1) {
@@ -379,9 +388,7 @@ sub getFavorites {
 
 		$items = [ map { _renderItem($client, $_, { addArtistToTitle => 1 }) } @$items ] if $items;
 
-		$cb->( {
-			items => $items
-		} );
+		$cb->( { items => $items } );
 	}, $params->{type}, $args->{quantity} != 1 );
 }
 
@@ -391,10 +398,8 @@ sub getArtistAlbums {
 	getAPIHandler($client)->artistAlbums(sub {
 		my $items = _renderAlbums(@_);
 
-		$cb->( {
-			items => $items,
-			# the action can be there or in the sub-item as an itemActions
-		} );
+		# the action can be there or in the sub-item as an itemActions
+		$cb->( { items => $items } );
 	}, $params->{id});
 }
 
@@ -403,9 +408,7 @@ sub getArtistTopTracks {
 
 	getAPIHandler($client)->artistTopTracks(sub {
 		my $items = _renderTracks(@_);
-		$cb->( {
-			items => $items
-		} );
+		$cb->( { items => $items } );
 	}, $params->{id});
 }
 
@@ -414,9 +417,7 @@ sub getArtistRelated {
 
 	getAPIHandler($client)->artistRelated(sub {
 		my $items = _renderArtists($client, @_);
-		$cb->( {
-			items => $items
-		} );
+		$cb->( { items => $items } );
 	}, $params->{id});
 }
 
@@ -425,9 +426,7 @@ sub getAlbum {
 
 	getAPIHandler($client)->albumTracks(sub {
 		my $items = _renderTracks(shift);
-		$cb->( {
-			items => $items
-		} );
+		$cb->( { items => $items } );
 	}, $params->{id}, $params->{title} );
 }
 
@@ -435,7 +434,7 @@ sub getGenres {
 	my ( $client, $callback ) = @_;
 
 	getAPIHandler($client)->genres(sub {
-		my $items = [ map { _renderItem($client, $_) } @{$_[0]} ];
+		my $items = [ map { _renderGenreMusic($client, $_) } @{$_[0]} ];
 
 		$callback->( { items => $items } );
 	});
@@ -457,7 +456,6 @@ sub getFlow {
 			on_select => 'play',
 			play => "deezer://$mode:" . $_ . '.flow',
 			url => "deezer://$mode:" . $_ . '.flow',
-			#favorites_url => "deezer://$mode:' . $_ . '.flow',
 			image => 'plugins/Deezer/html/' . $_ . '.png',
 		}
 	} @categories ];
@@ -481,9 +479,7 @@ sub getGenreItems {
 
 		my $items = [ map { _renderItem($client, $_, { addArtistToTitle => 1 } ) } @{$_[0]} ];
 
-		$cb->( {
-			items => $items
-		} );
+		$cb->( { items => $items } );
 	}, $params->{id}, $params->{type} );
 }
 
@@ -499,44 +495,40 @@ sub getCompound {
 	}, $params->{path} );
 }
 
-=comment
-sub getMoods {
-	my ( $client, $callback, $args, $params ) = @_;
-	getAPIHandler($client)->moods(sub {
-		my $items = [ map {
-			{
-				name => $_->{name},
-				type => 'link',
-				url => \&getMoodPlaylists,
-				image => Plugins::Deezer::API->getImageUrl($_, 'usePlaceholder', 'mood'),
-				passthrough => [ { mood => $_->{path} } ],
-			};
-		} @{$_[0]} ];
-
-		$callback->( { items => $items } );
-	} );
-}
-
-sub getMoodPlaylists {
-	my ( $client, $cb, $args, $params ) = @_;
-	getAPIHandler($client)->moodPlaylists(sub {
-		my $items = [ map { _renderPlaylist($_) } @{$_[0]->{items}} ];
-
-		$cb->( {
-			items => $items
-		} );
-	}, $params->{mood} );
-}
-=cut
-
 sub getPlaylist {
 	my ( $client, $cb, $args, $params ) = @_;
 	getAPIHandler($client)->playlist(sub {
 		my $items = _renderTracks($_[0], 1);
-		$cb->( {
-			items => $items
-		} );
+		$cb->( { items => $items } );
 	}, $params->{id} );
+}
+
+sub getPodcasts {
+	my ( $client, $cb, $args, $params ) = @_;
+
+	getAPIHandler($client)->podcasts(sub {
+		my $items = [ map { _renderGenrePodcast($_) } @{$_[0]} ];
+
+		unshift @$items, {
+			name => cstring($client, 'FAVORITES'),
+			url => \&getFavorites,
+			passthrough => [{ type => 'podcasts' }],
+		};
+
+		$cb->( { items => $items } );
+	}, $params->{id}, $params->{title} );
+}
+
+sub getPodcastEpisodes {
+	my ( $client, $cb, $args, $params ) = @_;
+
+	getAPIHandler($client)->podcastEpisodes(sub {
+		my $items = [ map { { %$_, podcast_id => $params->{id} } } @{$_[0]} ];
+		$items = _renderEpisodes($items);
+
+		$cb->( { items => $items } );
+	}, $params->{id}, $params->{title} );
+
 }
 
 sub search {
@@ -550,9 +542,7 @@ sub search {
 		my $items = shift;
 		$items = [ map { _renderItem($client, $_) } @$items ] if $items;
 
-		$cb->( {
-			items => $items || []
-		} );
+		$cb->( { items => $items || [] } );
 	}, $args);
 
 }
@@ -577,11 +567,16 @@ sub _renderItem {
 	elsif ($type eq 'radio') {
 		return _renderRadio($item);
 	}
+=comment
 	elsif ($type eq 'genre') {
 		return _renderGenre($client, $item, $args->{handler});
 	}
-	elsif ($type eq 'mix') {
-		return _renderMix($client, $item);
+=cut
+	elsif ($type eq 'podcast') {
+		return _renderPodcast($item);
+	}
+	elsif ($type eq 'episode') {
+		return _renderEpisode($item, $args->{index});
 	}
 }
 
@@ -600,7 +595,6 @@ sub _renderPlaylist {
 		name => $item->{title},
 		line1 => $item->{title},
 		line2 => $item->{user}->{name},
-		#favorites_url => 'deezer://playlist:' . $item->{id},
 		play => 'deezer://playlist:' . $item->{id},
 		type => 'playlist',
 		itemActions => {
@@ -634,8 +628,8 @@ sub _renderAlbum {
 		line1 => $item->{title},
 		line2 => $item->{artist}->{name},
 		type => 'playlist',
-		# we need the 'play' item for the actions to be visible...
-		#favorites_url => 'deezer://album:' . $item->{id},
+		# we need the 'play' item for the actions to be visible, but when there
+		# is a play, a click on the item won't explode it when it's a favorite (sigh...)
 		play => 'deezer://album:' . $item->{id},
 		itemActions => {
 			info => {
@@ -659,7 +653,6 @@ sub _renderRadio {
 	return {
 		name => $item->{title},
 		line1 => $item->{description},
-		#favorites_url => 'deezer://radio:' . $item->{id},
 		on_select => 'play',
 		play => "deezer://radio/$item->{id}/tracks.dzr",
 		url => "deezer://radio/$item->{id}/tracks.dzr",
@@ -700,6 +693,62 @@ sub _renderTrack {
 	};
 }
 
+sub _renderPodcasts {
+	my ($podcasts) = @_;
+
+	return [ map {
+		_renderPodcast($_);
+	} @$podcasts ];
+}
+
+sub _renderPodcast {
+	my ($item) = @_;
+
+	return {
+		name => $item->{title},
+		line1 => $item->{title},
+		line2 => $item->{description},
+		play => 'deezer://podcast:' . $item->{id},
+		type => 'playlist',
+		itemActions => {
+			info => {
+				command   => ['deezer_favs', 'items'],
+				fixedParams => { type => 'podcasts', id => $item->{id}, title => $item->{title} },
+			},
+		},
+		url => \&getPodcastEpisodes,
+		image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder'),
+		passthrough => [ {
+			id => $item->{id},
+			title => $item->{title},
+		} ],
+	};
+}
+
+sub _renderEpisodes {
+	my ($results) = @_;
+
+	my $items = [];
+	push @$items, _renderEpisode($results->[$_], $_) foreach (0...$#{$results});
+
+	return $items;
+}
+
+sub _renderEpisode {
+	my ($item, $index) = @_;
+
+	my $url = "deezerpodcast://$item->{podcast_id}/$item->{id}_$index";
+
+	return {
+		name => $item->{title},
+		on_select => 'play',
+		playall => 1,
+		play => $url,
+		url => $url,
+		image => $item->{cover},
+	};
+}
+
 sub _renderArtists {
 	my ($client, $results) = @_;
 
@@ -730,7 +779,6 @@ sub _renderArtist {
 	}, {
 		name => cstring($client, 'RADIO'),
 		on_select => 'play',
-		#favorites_url => 'deezer://artist-radio:' . $item->{id},
 		favorites_title => "$item->{name} - " . cstring($client, 'RADIO'),
 		favorites_icon => $image,
 		play => "deezer://artist/$item->{id}/radio.dzr",
@@ -790,10 +838,17 @@ sub _renderCompound {
 		image => 'html/images/playall.png',
 	} if $item->{tracks};
 
+	push @$items, {
+		name => cstring($client, 'PLUGIN_PODCAST'),
+		items => _renderPodcasts($item->{podcasts}),
+		type  => 'outline',
+		image => 'plugins/Deezer/html/rss.png',
+	} if $item->{podcasts};
+
 	return $items;
 }
 
-sub _renderGenre {
+sub _renderGenreMusic {
 	my ($client, $item, $renderer) = @_;
 
 	my $items = [ {
@@ -816,6 +871,20 @@ sub _renderGenre {
 		items => $items,
 		image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder', 'genre'),
 		passthrough => [ { id => $item->{id} } ],
+	};
+}
+
+sub _renderGenrePodcast {
+	my ($item) = @_;
+
+	return {
+		name => $item->{name},
+		url => \&getGenreItems,
+		# there is no usable icon/image
+		passthrough => [ {
+			id => $item->{id},
+			type => 'podcasts',
+		} ],
 	};
 }
 

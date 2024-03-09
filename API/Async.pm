@@ -141,6 +141,18 @@ sub track {
 	});
 }
 
+sub episode {
+	my ($self, $cb, $id) = @_;
+
+	$self->_get("/episode/$id", sub {
+		my $episode = shift;
+
+		# even if cachable data are missing, we *want* to cache
+		($episode) = @{Plugins::Deezer::API->cacheEpisodeMetadata( [$episode], { cache => 1 } )} if $episode;
+		$cb->($episode);
+	});
+}
+
 sub artist {
 	my ($self, $cb, $id) = @_;
 
@@ -266,9 +278,27 @@ sub albumTracks {
 	});
 }
 
+sub podcastEpisodes {
+	my ($self, $cb, $id, $title) = @_;
+
+	$self->_get("/podcast/$id/episodes", sub {
+		my $podcast = shift;
+		my $episodes = Plugins::Deezer::API->cacheEpisodeMetadata($podcast->{data}, { podcast => $title } ) if $podcast;
+
+		$cb->($episodes || []);
+	}, { _ttl => USER_CONTENT_TTL } );
+}
+
 sub radios {
 	my ($self, $cb) = @_;
 	$self->_get('/radio', sub {
+		$cb->($_[0]->{data} || []);
+	});
+}
+
+sub podcasts {
+	my ($self, $cb) = @_;
+	$self->_get('/podcast', sub {
 		$cb->($_[0]->{data} || []);
 	});
 }
@@ -282,10 +312,9 @@ sub genres {
 
 sub genreByType {
 	my ($self, $cb, $id, $type) = @_;
-
 	$self->_get("/genre/$id/$type", sub {
 		$cb->($_[0]->{data} || []);
-	});
+	}, { _ttl => $type =~ /podcast/ ? USER_CONTENT_TTL : DEFAULT_TTL });
 }
 
 sub moods {
@@ -516,6 +545,40 @@ sub getTrackUrl {
 			return $cb->() unless @trackTokens;
 
 			$self->_getProviders( $cb, $tokens->{license}, $params->{quality}, \@trackTokens, \@trackIds );
+		}, $args, $content);
+	} );
+}
+
+sub getEpisodesUrl {
+	my ($self, $cb, $podcast, $index, $count) = @_;
+
+	$self->_getUserContext( sub {
+		my ($tokens, $mode) = @_;
+		return $cb->() unless $tokens;
+
+		my $args = {
+			method => 'deezer.pageShow',
+			api_token => $tokens->{csrf},
+			_contentType => 'application/json',
+			_cookies => $mode,
+		};
+
+		my $accounts = $prefs->get('accounts');
+
+		my $content = encode_json( {
+			show_id => $podcast,
+			country => $accounts->{$self->userId}->{country},
+			lang => lc(preferences('server')->get('language')),
+			nb => $count || 1,
+			start => $index || 0,
+			user_id => $self->userId,
+		} );
+
+		$self->_ajax( sub {
+			my $result = shift;
+			$result = $result->{results}->{EPISODES}->{data} if $result;
+
+			$cb->($result || []);
 		}, $args, $content);
 	} );
 }

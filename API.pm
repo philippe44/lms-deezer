@@ -31,6 +31,8 @@ use constant IMAGE_SIZES => {
 	genre  => '500x500',
 	radio  => '500x500',
 	playlist => '500x500',
+	podcast => '500x500',
+	episode => '500x500',
 };
 
 use constant SOUND_QUALITY => {
@@ -69,7 +71,7 @@ sub getQuality {
 sub getImageUrl {
 	my ($class, $data, $usePlaceholder, $type) = @_;
 
-	if ( my $coverId = $data->{md5_image} || $data->{picture_medium} || ($data->{album} && $data->{album}->{cover}) ) {
+	if ( my $coverId = $data->{md5_image} || $data->{picture_big} || $data->{picture_medium} || $data->{picture} || ($data->{album} && $data->{album}->{cover}) ) {
 
 		return $data->{cover} = $coverId if $coverId =~ /^https?:/;
 
@@ -92,7 +94,7 @@ sub getImageUrl {
 sub typeOfItem {
 	my ($class, $item) = @_;
 
-	if ( $item->{type} && $item->{type} =~ /(?:playlist|artist|album|track|radio|genre)/i ) {
+	if ( $item->{type} && $item->{type} =~ /(?:playlist|artist|album|track|radio|genre|podcast|episode)/i ) {
 		return $item->{type};
 	}
 	elsif ( $item->{duration} ) {
@@ -140,6 +142,39 @@ sub cacheTrackMetadata {
 
 		$meta;
 	} @$tracks ];
+}
+
+
+sub cacheEpisodeMetadata {
+	my ($class, $episodes, $params) = @_;
+	
+	return [] unless $episodes;
+	$params ||= {};
+	
+	return [ map {
+		my $entry = $_;
+		my $oldMeta = $cache->get( 'deezer_episode_meta_' . $entry->{id}) || {};
+		my $icon = $class->getImageUrl($entry, 'usePlaceholder', 'episode');
+
+		# consolidate metadata in case parsing of stream came first (huh?)
+		my $meta = {
+			%$oldMeta,
+			id => $entry->{id},
+			title => $entry->{title},
+			album => $entry->{podcast} ? $entry->{podcast}->{title} : $params->{podcast},
+			duration => $entry->{duration},
+			icon => $icon,
+			cover => $icon,
+		};
+		
+		# make sure we won't come back
+		$meta->{_complete} = 1 if $meta->{album} || $params->{cache};
+
+		# cache track metadata aggressively
+		$cache->set( 'deezer_episode_meta_' . $entry->{id}, $meta, time() + 90 * 86400);
+
+		$meta;
+	} @$episodes ];
 }
 
 

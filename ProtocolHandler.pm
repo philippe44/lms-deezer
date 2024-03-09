@@ -32,8 +32,8 @@ my $cryptoHelper;
 # https://deezer.com/track/95570766
 # https://deezer.com/album/95570764
 # https://deezer.com/playlist/5a36919b-251c-4fa7-802c-b659aef04216
-my $URL_REGEX = qr{^https://(?:\w+\.)?deezer.com/(track|playlist|album|artist)/([a-z\d-]+)}i;
-my $URI_REGEX = qr{^deezer://(playlist|album|artist|):?([0-9a-z-]+)}i;
+my $URL_REGEX = qr{^https://(?:\w+\.)?deezer.com/(track|playlist|album|artist|podcast)/([a-z\d-]+)}i;
+my $URI_REGEX = qr{^deezer://(playlist|album|artist|podcast|):?([0-9a-z-]+)}i;
 Slim::Player::ProtocolHandlers->registerURLHandler($URL_REGEX, __PACKAGE__);
 Slim::Player::ProtocolHandlers->registerURLHandler($URI_REGEX, __PACKAGE__);
 
@@ -103,10 +103,7 @@ sub forceTranscode {
 # goodies. Also, methods like isAudio, isRemote, contentType (and maybe others) that are
 # provided by HTTP or its ancestors must be provided then.
 sub new {
-	my $class  = shift;
-	my $args   = shift;
-
-	my $client = $args->{client};
+	my ($class, $args) = @_;
 
 	my $song      = $args->{song};
 	my $streamUrl = $song->streamUrl() || return;
@@ -117,7 +114,7 @@ sub new {
 	my $sock = $class->SUPER::new( {
 		url     => $streamUrl,
 		song    => $args->{song},
-		client  => $client,
+		client  => $args->{client},
 	} ) || return;
 
 	my $key = $Plugins::Deezer::API::Auth::cbc;
@@ -182,6 +179,9 @@ sub explodePlaylist {
 		}
 		elsif ($type eq 'artist') {
 			$method = \&Plugins::Deezer::Plugin::getArtistTopTracks;
+		}
+		elsif ($type eq 'podcast') {
+			$method = \&Plugins::Deezer::Plugin::getPodcastEpisodes;
 		}
 
 		$method->($client, $cb, { }, { id => $id });
@@ -452,18 +452,13 @@ sub _parseFlac {
 }
 
 =comment
-# URL used for CLI trackinfo queries
 sub trackInfoURL {
 	my ( $class, $client, $url ) = @_;
 
-	my ($trackId) = _getStreamParams( $url );
-
-	# SN URL to fetch track info menu
-	my $trackInfoURL = Slim::Networking::SqueezeNetwork->url(
-		'/api/wimp/v1/opml/trackinfo?trackId=' . $trackId
-	);
-
-	return $trackInfoURL;
+	return [ {
+		title => "this is a title",
+		type => 'text',
+	} ];
 }
 =cut
 
