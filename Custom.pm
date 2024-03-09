@@ -119,7 +119,9 @@ sub _home {
 
 	# we need the order of that query to be always the same so that cache key 
 	# works, but encode_json does not guaranty that
-	state $home = encode_json( {
+	my $language = lc(preferences('server')->get('language'));
+	
+	state $home = {
 		PAGE => 'home',
 		VERSION => '2.5',
 		SUPPORT => {
@@ -127,12 +129,20 @@ sub _home {
 			'horizontal-list' => ['track','song'],
 			'long-card-horizontal-grid' => ['album','artist','artistLineUp','channel','livestream','flow','playlist','radio','show','smarttracklist','track'],
 		},
-		LANG => 'en',
-	} );
-
+		LANG => $language,
+	};
+	
+	state $jsonHome = encode_json($home);
+	
+	if ($home->{LANG} ne $language) {
+		$home->{LANG} = $language;
+		$jsonHome = encode_json($home);
+		main::INFOLOG && $log->is_info && $log->info("Language change detected");		
+	}
+	
 	my $params = {
 		method => 'page.get',
-		gateway_input => $home,
+		gateway_input => $jsonHome,
 	};
 
 	_userQuery( $self, sub {
