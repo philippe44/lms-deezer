@@ -1,14 +1,14 @@
 <?xml version='1.0' standalone='yes'?>
 <extensions>
   <plugins>
-    <plugin name="Deezer" minTarget="8.3" version="2.7.2" maxTarget="*">
+    <plugin minTarget="8.3" name="Deezer" version="2.8.1" maxTarget="*">
       <link>https://github.com/philippe44/lms-deezer</link>
-      <category>musicservices</category>
       <title lang="EN">Deezer local</title>
+      <url>https://github.com/philippe44/lms-deezer/releases/download/2.8.1/Deezer.zip</url>
       <creator>philippe_44, Michael Herger</creator>
-      <sha>b0d644851b1a40aa720168f8a0975ff8f0e69d8d</sha>
-      <url>https://github.com/philippe44/lms-deezer/releases/download/2.7.2/Deezer.zip</url>
       <desc lang="EN">Deezer for local LMS use</desc>
+      <category>musicservices</category>
+      <sha>ba14e224e03b0f77f6daa14eaac5316094f7a8db</sha>
     </plugin>
   </plugins>
 </extensions>
