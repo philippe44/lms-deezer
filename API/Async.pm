@@ -265,14 +265,25 @@ sub compound {
 	});
 }
 
+sub album {
+	my ($self, $cb, $id) = @_;
+
+	$self->_get("/album/$id", sub {
+		my $album = $_[0] unless $_[0]->{error};
+		$cb->($album);
+	});
+}
+
 sub albumTracks {
 	my ($self, $cb, $id, $title) = @_;
 
-	$self->_get("/album/$id/tracks", sub {
+	# don't ask directly for tracks or album data will be missing
+	#$self->_get("/album/$id/tracks", sub {
+	$self->_get("/album/$id", sub {
 		my $album = shift;
-		my $tracks = $album->{data} if $album;
+		my $tracks = $album->{tracks}->{data} if $album;
 		# only missing data in album/tracks is the album itself...
-		$tracks = Plugins::Deezer::API->cacheTrackMetadata( $tracks, { album => $title } ) if $tracks;
+		$tracks = Plugins::Deezer::API->cacheTrackMetadata( $tracks ) if $tracks;
 
 		$cb->($tracks || []);
 	});
@@ -317,22 +328,15 @@ sub genreByType {
 	}, { _ttl => $type =~ /podcast/ ? USER_CONTENT_TTL : DEFAULT_TTL });
 }
 
-sub moods {
-	my ($self, $cb) = @_;
-	$self->_get('/moods', $cb);
-}
 
-sub moodPlaylists {
-	my ($self, $cb, $mood) = @_;
-
-	$self->_get("/moods/$mood/playlists", sub {
-		$cb->(@_);
-	},{
-		limit => MAX_LIMIT,
+sub playlist {
+	my ($self, $cb, $id) = @_;
+	$self->_get("/playlist/$id", sub {
+		$cb->($_[0]);
 	});
 }
 
-sub playlist {
+sub playlistTracks {
 	my ($self, $cb, $id) = @_;
 
 	my $cacheKey = 'deezer_playlist_' . $id;

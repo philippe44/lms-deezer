@@ -111,7 +111,6 @@ sub cacheTrackMetadata {
 	my ($class, $tracks, $params) = @_;
 	
 	return [] unless $tracks;
-	$params ||= {};
 	
 	return [ map {
 		my $entry = $_;
@@ -124,7 +123,7 @@ sub cacheTrackMetadata {
 			id => $entry->{id},
 			title => $entry->{title},
 			artist => $entry->{artist},
-			album => $entry->{album} ? $entry->{album}->{title} : $params->{album},
+			album => $entry->{album},
 			duration => $entry->{duration},
 			icon => $icon,
 			cover => $icon,
@@ -135,7 +134,7 @@ sub cacheTrackMetadata {
 		};
 		
 		# make sure we won't come back
-		$meta->{_complete} = 1 if $meta->{tracknum} || $params->{cache};
+		$meta->{_complete} = 1 if $meta->{tracknum} || ($params && $params->{cache});
 
 		# cache track metadata aggressively
 		$cache->set( 'deezer_meta_' . $entry->{id}, $meta, time() + 90 * 86400);

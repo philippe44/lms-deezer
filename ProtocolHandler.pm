@@ -16,6 +16,7 @@ use Slim::Utils::Prefs;
 use Slim::Utils::Timers;
 use Slim::Utils::Errno qw(EINTR EWOULDBLOCK);
 use Slim::Utils::Scanner::Remote;
+use Slim::Utils::Strings qw(cstring);
 
 use Plugins::Deezer::Plugin;
 use Plugins::Deezer::API;
@@ -508,6 +509,7 @@ sub getMetadataFor {
 	# if metadata is in cache and is full
 	if ( $meta && ($meta->{_complete} || ($song && $song->track->url ne $url)) ) {
 		$meta->{artist} = $meta->{artist}->{name} if ref $meta->{artist};
+		$meta->{album} = $meta->{album}->{title} if ref $meta->{album};
 		return $meta;
 	}
 
