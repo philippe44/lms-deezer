@@ -1162,19 +1162,7 @@ sub menuBrowse {
 			
 			getAPIHandler($client)->artist(sub {
 				my $feed = _renderArtist( $client, $_[0] ) if $_[0];
-				foreach my $item (@{$feed->{items}}) {
-					$feed->{jive} = {
-						actions => {
-							go => {
-								cmd => [ 'deezer_browse', 'items' ],
-								params => {
-									type => $type,
-									id => $id,
-								},
-							},
-						},
-					};
-				}	
+
 				$cb->($feed);
 			}, $id );
 		}
