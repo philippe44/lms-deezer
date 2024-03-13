@@ -453,6 +453,9 @@ sub _parseFlac {
 }
 
 =comment
+# I fail to see the real benefit of that function as I think we still need
+# to create an action menu with trackinfo command. Maybe it's useful for
+# remote CLI queries 
 sub trackInfoURL {
 	my ( $class, $client, $url ) = @_;
 

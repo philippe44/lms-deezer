@@ -22,6 +22,44 @@ my $log = Slim::Utils::Log->addLogCategory({
 
 my $prefs = preferences('plugin.deezer');
 
+# Notes for the forgetful on feeds 
+
+# We need a 'play' with a URL, not a CODE in items for actions to be visible. Unfortunately,
+# then LMS forces favorite's type to be 'audio' and that prevents proper explodePlayList when
+# browsing (not playing) favorite later (because 'audio' type don't need to be 'exploded' 
+# except for playing. This should be fixed in https://github.com/LMS-Community/slimserver/pull/1008
+
+# Also, don't use a URL for 'url' instead of a CODE otherwise explodePlaylist is used when 
+# browsing and then the passthrough is ignored and obviously anything important there is lost
+# or it would need to be in the URL as well.
+
+# Similiarly, if type is 'audio' then the OPML manager does not need to call explodePlaylist 
+# and if we also add an 'info' action this can be called when clicking on the item (classic)
+# or on the (M)ore icon. If there is no 'info' action, clicking on an 'audio' item displays
+# little about it, except bitrate and duration fio set in the item (only for classic)
+
+# Also, when type is not 'audio', we can set an 'items' action that is executed in classic 
+# when clicking on item and won't make M(ore) context menu visible and it is ignored in material
+# so that's a bit useless. 
+
+# Actions can be directly in the feed in which case they are global on they can be in each item 
+# named 'itemActions'. They use queries and require a AddDispatch with a matching command. 
+# The 'fixedParams' are hashes on strings that will be retrieved by getParams or using 'variables'
+# they can be extracted from items themselves. It's an array of pairs of key in the item and key 
+# in the query variables => [ 'url', 'url' ]
+
+# We can't re-use Slim::Menu::TrackInfo to create actions using the 'menu' method as it can only
+# create track objects for items that are in the database, unless the ObjectForUrl has some way
+# to have PH overload a method to create the object, but I've not found that anywhere in Schema
+# Now, the PH can overload trackInfoUrl which shortcuts the whole Slim::Menu::TrackInfo and returns
+# a feed but I'm not sure I see the real benefit in doing that, especially because this does not 
+# exist for albumInfo/artistInfo and also you still need to manually create the action in items. 
+
+# TODO 
+# - add some notes on creating usable links on trackInfo/albuminfo/artistsinfo 
+# - fix the podcast title as part of the passthrough
+# - 
+
 sub initPlugin {
 	my $class = shift;
 
@@ -71,6 +109,7 @@ sub initPlugin {
 #  |  |  |  |Function to call
 	Slim::Control::Request::addDispatch( [ 'deezer_info', 'items', '_index', '_quantity' ],	[ 1, 1, 1, \&menuInfoWeb ]	);
 	Slim::Control::Request::addDispatch( [ 'deezer_info', 'jive' ],	[ 1, 1, 1, \&menuInfoJive ]	);
+	Slim::Control::Request::addDispatch( [ 'deezer_browse', 'items' ],	[ 1, 1, 1, \&menuBrowse ]	);
 
 =comment
 	Slim::Menu::GlobalSearch->registerInfoProvider( deezer => (
@@ -554,11 +593,6 @@ sub _renderAlbum {
 		type => 'playlist',
 		favorites_type => 'playlist',
 		favorites_url => 'deezer://album:' . $item->{id},
-		# We need a 'play' with a hash, not a CODE item for actions to be visible, but 
-		# then LMS forces favorite's type to be audio and that prevents proper "explode" 
-		# if the favorite later. This should be fixed in https://github.com/LMS-Community/slimserver/pull/1008
-		# If we use the url for play then explodeplaylist is used but then the passthrough 
-		# is ignored, so explodePlaylist must recover title
 		play => 'deezer://album:' . $item->{id},
 		itemActions => {
 			info => {
@@ -567,7 +601,6 @@ sub _renderAlbum {
 					type => 'albums', 
 					id => $item->{id}, 
 				},
-				#variables => [ 'url', 'url', 'name', 'name' ],
 			},
 		},
 		url => \&getAlbum,
@@ -603,19 +636,6 @@ sub _renderTrack {
 	my $title = $item->{title};
 	$title .= ' - ' . $item->{artist}->{name} if $addArtistToTitle;
 	my $url = "deezer://$item->{id}." . Plugins::Deezer::API::getFormat();
-	
-	# - if this is not of type 'audio' then the OPML manager must call explodePlaylist 
-	# to know what this is about. If we also add an 'info' action this can be called as
-	# well as context menu but only for classic and material skins.  
-	# -if we set type 'audio', then explodePlaylist is not called but clicking on item 
-	# in classic will display some information like duration and bitrate, UNLESS there 
-	# is an 'info' in which case clicking on item is like clicking on M(ore). With the 
-	# material skin, clicking on the item does not do anything.
-	# - last but not least, when type is not 'audio', we can set an 'items' action that is 
-	# executed in classic when clicking on item and won't make M(ore) context menu visible 
-	# but it is ignored in material so that's a bit useless. 
-	# - best option seems 'audio', and 'info' itemActions but I'd like to find a solution
-	# to have a proper "trackInfo" menu when clicking on item - no idea how though
 	
 	return {
 		name => $title,
@@ -1116,7 +1136,50 @@ sub menuInfoJive {
 	my $action = $request->getParam('action');
 	
 	$api->updateFavorite( sub { }, $action, $type, $id );
-}	
+}
+
+sub menuBrowse {
+	my $request = shift;
+	my $client = $request->client;
+
+	my $type = $request->getParam('type');
+	my $id = $request->getParam('id');
+
+	$request->addParam('_index', 0);
+	$request->addParam('_quantity', 10);
+
+	Slim::Control::XMLBrowser::cliQuery('deezer_browse', sub {
+		my ($client, $cb, $args) = @_;
+
+		if ( $type =~ /tracks/ ) {
+		} elsif ( $type =~ /album/ ) {
+
+			getAlbum($client, sub {
+				$cb->($_[0]);
+			}, $args, { id => $id } );
+			
+		} elsif ( $type =~ /artist/ ) {
+			
+			getAPIHandler($client)->artist(sub {
+				my $feed = _renderArtist( $client, $_[0] ) if $_[0];
+				foreach my $item (@{$feed->{items}}) {
+					$feed->{jive} = {
+						actions => {
+							go => {
+								cmd => [ 'deezer_browse', 'items' ],
+								params => {
+									type => $type,
+									id => $id,
+								},
+							},
+						},
+					};
+				}	
+				$cb->($feed);
+			}, $id );
+		}
+	}, $request );
+}
 
 sub _menuTrackInfo {
 	my ($api, $cb, $params) = @_;
@@ -1131,19 +1194,25 @@ sub _menuTrackInfo {
 	my $items = [ {
 		type => 'link',
 		name =>  $track->{album}->{title},
-		# seem that the option of CODE works better on material
-		url => \&getAlbum,
-		passthrough => [ { id => $track->{album}->{id} } ],		
 		label => 'ALBUM',
-		# needs actions to display a link in classic
-		#actions => ...
+		isContextMenu => 1,
+		refresh => 1,
+		itemActions => {
+			items => {
+					command     => ['deezer_browse', 'items'],
+					fixedParams => { type => 'album', id => $track->{album}->{id} },
+				},
+		},
 	}, {
-		type => 'playlist',
+		type => 'link',
 		name =>  $track->{artist}->{name},
-		url => 'N/A',
 		label => 'ARTIST',
-		# needs actions to display a link
-		#actions => ...
+		itemActions => {
+			items => {
+					command     => ['deezer_browse', 'items'],
+					fixedParams => { type => 'artist', id => $track->{artist}->{id} },
+				},
+		},
 	}, {
 		type => 'text',
 		name => sprintf('%s:%02s', int($track->{duration} / 60), $track->{duration} % 60),
@@ -1164,10 +1233,13 @@ sub _menuAlbumInfo {
 		my $items = [ {
 			type => 'playlist',
 			name =>  $album->{artist}->{name},
-			url => 'N/A',
 			label => 'ARTIST',
-			# needs actions to display a link
-			#actions => ...
+			itemActions => {
+				items => {
+					command     => ['deezer_browse', 'items'],
+					fixedParams => { type => 'artist', id => $album->{artist}->{id} },
+				},
+			},
 		}, {
 			type => 'text',
 			name => $album->{nb_tracks} || 0,
@@ -1205,8 +1277,12 @@ sub _menuArtistInfo {
 			name =>  $artist->{name},
 			url => 'N/A',
 			label => 'ARTIST',
-			# needs actions to display a link
-			#actions => ...
+			itemActions => {
+				items => {
+					command     => ['deezer_browse', 'items'],
+					fixedParams => { type => 'artist', id => $artist->{id} },
+				},
+			},
 		}, {
 			type => 'text',
 			name => $artist->{nb_album},
@@ -1232,15 +1308,11 @@ sub _menuPlaylistInfo {
 			name =>  $playlist->{creator}->{name},
 			url => 'N/A',
 			label => 'ARTIST',
-			# needs actions to display a link
-			#actions => ...
 		},{
 			type => 'link',
 			name =>  $playlist->{title},
 			url => 'N/A',
 			label => 'ALBUM',
-			# needs actions to display a link
-			#actions => ...
 		},{
 			type => 'text',
 			name => $playlist->{nb_tracks} || 0,
