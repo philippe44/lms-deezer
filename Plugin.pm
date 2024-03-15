@@ -2,6 +2,7 @@ package Plugins::Deezer::Plugin;
 
 use strict;
 use Async::Util;
+use Tie::Cache::LRU;
 
 use base qw(Slim::Plugin::OPMLBased);
 
@@ -22,43 +23,48 @@ my $log = Slim::Utils::Log->addLogCategory({
 
 my $prefs = preferences('plugin.deezer');
 
-# Notes for the forgetful on feeds 
+# see note on memorizing feeds for different dispatches
+my %rootFeeds;
+tie %rootFeeds, 'Tie::Cache::LRU', 64;
+
+# Notes for the forgetful on feeds
 
 # We need a 'play' with a URL, not a CODE in items for actions to be visible. Unfortunately,
 # then LMS forces favorite's type to be 'audio' and that prevents proper explodePlayList when
-# browsing (not playing) favorite later (because 'audio' type don't need to be 'exploded' 
+# browsing (not playing) favorite later (because 'audio' type don't need to be 'exploded'
 # except for playing. This should be fixed in https://github.com/LMS-Community/slimserver/pull/1008
 
-# Also, don't use a URL for 'url' instead of a CODE otherwise explodePlaylist is used when 
+# Also, don't use a URL for 'url' instead of a CODE otherwise explodePlaylist is used when
 # browsing and then the passthrough is ignored and obviously anything important there is lost
 # or it would need to be in the URL as well.
 
-# Similiarly, if type is 'audio' then the OPML manager does not need to call explodePlaylist 
+# Similiarly, if type is 'audio' then the OPML manager does not need to call explodePlaylist
 # and if we also add an 'info' action this can be called when clicking on the item (classic)
 # or on the (M)ore icon. If there is no 'info' action, clicking on an 'audio' item displays
 # little about it, except bitrate and duration fio set in the item (only for classic)
 
-# Also, when type is not 'audio', we can set an 'items' action that is executed in classic 
+# Also, when type is not 'audio', we can set an 'items' action that is executed in classic
 # when clicking on item and won't make M(ore) context menu visible and it is ignored in material
-# so that's a bit useless. 
+# so that's a bit useless.
 
-# Actions can be directly in the feed in which case they are global on they can be in each item 
-# named 'itemActions'. They use queries and require a AddDispatch with a matching command. 
+# Actions can be directly in the feed in which case they are global on they can be in each item
+# named 'itemActions'. They use cliQuery and require a AddDispatch with a matching command. See
+# comment on finding a root/anchor when using JSONRPC interface
 # The 'fixedParams' are hashes on strings that will be retrieved by getParams or using 'variables'
-# they can be extracted from items themselves. It's an array of pairs of key in the item and key 
+# they can be extracted from items themselves. It's an array of pairs of key in the item and key
 # in the query variables => [ 'url', 'url' ]
 
 # We can't re-use Slim::Menu::TrackInfo to create actions using the 'menu' method as it can only
 # create track objects for items that are in the database, unless the ObjectForUrl has some way
 # to have PH overload a method to create the object, but I've not found that anywhere in Schema
 # Now, the PH can overload trackInfoUrl which shortcuts the whole Slim::Menu::TrackInfo and returns
-# a feed but I'm not sure I see the real benefit in doing that, especially because this does not 
-# exist for albumInfo/artistInfo and also you still need to manually create the action in items. 
+# a feed but I'm not sure I see the real benefit in doing that, especially because this does not
+# exist for albumInfo/artistInfo and also you still need to manually create the action in items.
 
-# TODO 
-# - add some notes on creating usable links on trackInfo/albuminfo/artistsinfo 
+# TODO
+# - add some notes on creating usable links on trackInfo/albuminfo/artistsinfo
 # - fix the podcast title as part of the passthrough
-# - 
+# - an URL to Deezer track/album/artist location (link provided by Deezer)
 
 sub initPlugin {
 	my $class = shift;
@@ -110,6 +116,7 @@ sub initPlugin {
 	Slim::Control::Request::addDispatch( [ 'deezer_info', 'items', '_index', '_quantity' ],	[ 1, 1, 1, \&menuInfoWeb ]	);
 	Slim::Control::Request::addDispatch( [ 'deezer_info', 'jive' ],	[ 1, 1, 1, \&menuInfoJive ]	);
 	Slim::Control::Request::addDispatch( [ 'deezer_browse', 'items' ],	[ 1, 1, 1, \&menuBrowse ]	);
+	Slim::Control::Request::addDispatch( [ 'deezer_browse', 'playlist', '_method' ],	[ 1, 1, 1, \&menuBrowse ]	);
 
 =comment
 	Slim::Menu::GlobalSearch->registerInfoProvider( deezer => (
@@ -194,6 +201,7 @@ sub handleFeed {
 			name => cstring($client, 'PLUGIN_DEEZER_FLOW'),
 			image => 'plugins/Deezer/html/flow.png',
 			on_select => 'play',
+			type => 'audio',
 			url => 'deezer://user/me/flow.dzr',
 			play => 'deezer://user/me/flow.dzr',
 		},{
@@ -453,7 +461,7 @@ sub getCompound {
 
 sub getPlaylist {
 	my ( $client, $cb, $args, $params ) = @_;
-	
+
 	getAPIHandler($client)->playlistTracks(sub {
 		my $items = _renderTracks($_[0], 1);
 		$cb->( { items => $items } );
@@ -560,9 +568,9 @@ sub _renderPlaylist {
 		itemActions => {
 			info => {
 				command   => ['deezer_info', 'items'],
-				fixedParams => { 
-					type => 'playlists', 
-					id => $item->{id}, 
+				fixedParams => {
+					type => 'playlists',
+					id => $item->{id},
 				},
 			},
 		},
@@ -597,14 +605,14 @@ sub _renderAlbum {
 		itemActions => {
 			info => {
 				command   => ['deezer_info', 'items'],
-				fixedParams => { 
-					type => 'albums', 
-					id => $item->{id}, 
+				fixedParams => {
+					type => 'albums',
+					id => $item->{id},
 				},
 			},
 		},
-		url => \&getAlbum,
 		image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder'),
+		url => \&getAlbum,
 		passthrough => [{ id => $item->{id}	}],
 	};
 }
@@ -636,7 +644,7 @@ sub _renderTrack {
 	my $title = $item->{title};
 	$title .= ' - ' . $item->{artist}->{name} if $addArtistToTitle;
 	my $url = "deezer://$item->{id}." . Plugins::Deezer::API::getFormat();
-	
+
 	return {
 		name => $title,
 		line1 => $item->{title},
@@ -650,8 +658,8 @@ sub _renderTrack {
 		itemActions => {
 			info => {
 				command   => ['deezer_info', 'items'],
-				fixedParams => { 
-					type => 'tracks', 
+				fixedParams => {
+					type => 'tracks',
 					id => $item->{id},
 				},
 			},
@@ -683,9 +691,9 @@ sub _renderPodcast {
 		itemActions => {
 			info => {
 				command   => ['deezer_info', 'items'],
-				fixedParams => { 
-					type => 'podcasts', 
-					id => $item->{id}, 
+				fixedParams => {
+					type => 'podcasts',
+					id => $item->{id},
 				},
 			},
 		},
@@ -745,6 +753,7 @@ sub _renderArtist {
 		image => 'plugins/Deezer/html/charts.png',
 		passthrough => [{ id => $item->{id} }],
 	}, {
+		type => 'link',
 		name => cstring($client, 'ALBUMS'),
 		url => \&getArtistAlbums,
 		image => 'html/images/albums.png',
@@ -754,10 +763,12 @@ sub _renderArtist {
 		on_select => 'play',
 		favorites_title => "$item->{name} - " . cstring($client, 'RADIO'),
 		favorites_icon => $image,
+		type => 'audio',
 		play => "deezer://artist/$item->{id}/radio.dzr",
 		url => "deezer://artist/$item->{id}/radio.dzr",
 		image => 'plugins/Deezer/html/smart_radio.png',
 	}, {
+		type => 'link',
 		name => cstring($client, 'PLUGIN_DEEZER_RELATED'),
 		url => \&getArtistRelated,
 		image => 'html/images/artists.png',
@@ -771,9 +782,9 @@ sub _renderArtist {
 		itemActions => {
 			info => {
 				command   => ['deezer_info', 'items'],
-				fixedParams => { 
-					type => 'artists', 
-					id => $item->{id}, 
+				fixedParams => {
+					type => 'artists',
+					id => $item->{id},
 				},
 			},
 		},
@@ -1037,68 +1048,71 @@ sub browseArtistMenu {
 
 sub menuInfoWeb {
 	my $request = shift;
-	my $client = $request->client;
 
 	# be careful that type must be artistS|albumS|playlistS|trackS
 	my $type = $request->getParam('type');
 	my $id = $request->getParam('id');
-	my $api = getAPIHandler($client);
 
+#$log->error("IN INFOWEB !!!!!!!!!!!!!!!!!!!!!");
 	$request->addParam('_index', 0);
 	$request->addParam('_quantity', 10);
 
-	$api->getFavorites( sub {
-		my $favorites = shift;
+	# we can't get the response live, we must be called back by cliQuery to
+	# call it back ourselves
+	Slim::Control::XMLBrowser::cliQuery('deezer_info', sub {
+		my ($client, $cb, $args) = @_;
 
-		my $action = (grep { $_->{id} == $id && ($type =~ /$_->{type}/ || !$_->{type}) } @$favorites) ? 'remove' : 'add';
-		my $title = $action eq 'remove' ? cstring($client, 'PLUGIN_FAVORITES_REMOVE') : cstring($client, 'PLUGIN_FAVORITES_SAVE');
+		my $api = getAPIHandler($client);
 
-		my $item;
+		$api->getFavorites( sub {
+			my $favorites = shift;
 
-		if ($request->getParam('menu')) {
-			$item = {
-				type => 'link',
-				name => $title,
-				isContextMenu => 1,
-				refresh => 1,
-				jive => {
-					actions => {
-						go => {
-							player => 0,
-							cmd    => [ 'deezer_info', 'jive' ],
-							params => {
-								type => $type,
-								id => $id,
-								action => $action,
-							},
-						}
+			my $action = (grep { $_->{id} == $id && ($type =~ /$_->{type}/ || !$_->{type}) } @$favorites) ? 'remove' : 'add';
+			my $title = $action eq 'remove' ? cstring($client, 'PLUGIN_FAVORITES_REMOVE') : cstring($client, 'PLUGIN_FAVORITES_SAVE');
+
+			my $item;
+
+			if ($request->getParam('menu')) {
+				$item = {
+					type => 'link',
+					name => $title,
+					isContextMenu => 1,
+					refresh => 1,
+					jive => {
+						actions => {
+							go => {
+								player => 0,
+								cmd    => [ 'deezer_info', 'jive' ],
+									params => {
+									type => $type,
+									id => $id,
+									action => $action,
+								},
+							}
+						},
+						nextWindow => 'parent'
 					},
-					nextWindow => 'parent'
-				},
-			};
-		} else {
-			$item = {
-				type => 'link',
-				name => $title,
-				url => sub {
-					my ($client, $cb) = @_;
-					$api->updateFavorite( sub {
-						$cb->({
-							items => [{
-								type => 'text',
-								name => cstring($client, 'COMPLETE'),
-							}],
-						});
-					}, $action, $type, $id );
-				},
-			};
-		}
+				};
+			} else {
+				$item = {
+					type => 'link',
+					name => $title,
+					url => sub {
+						my ($client, $ucb) = @_;
+						$api->updateFavorite( sub {
+							$ucb->({
+								items => [{
+									type => 'text',
+									name => cstring($client, 'COMPLETE'),
+								}],
+							});
+						}, $action, $type, $id );
+					},
+				};
+			}
 
-		Slim::Control::XMLBrowser::cliQuery('deezer_info', sub {
-			my ($client, $cb, $args) = @_;
-			
 			my $method;
-			
+
 			if ( $type =~ /tracks/ ) {
 				$method = \&_menuTrackInfo;
 			} elsif ( $type =~ /albums/ ) {
@@ -1110,7 +1124,7 @@ sub menuInfoWeb {
 			} elsif ( $type =~ /podcasts/ ) {
 				$method = \&_menuPodcastInfo;
 			}
-						
+
 			$method->( $api, sub {
 				my ($items, $icon) = @_;
 				unshift @$items, $item;
@@ -1121,10 +1135,10 @@ sub menuInfoWeb {
 					items => $items,
 				} );
 			}, $args->{params});
-			
-		}, $request );
-		
-	}, $type );
+
+		}, $type );
+
+	}, $request );
 }
 
 sub menuInfoJive {
@@ -1134,7 +1148,7 @@ sub menuInfoJive {
 	my $id = $request->getParam('id');
 	my $api = getAPIHandler($request->client);
 	my $action = $request->getParam('action');
-	
+
 	$api->updateFavorite( sub { }, $action, $type, $id );
 }
 
@@ -1142,27 +1156,49 @@ sub menuBrowse {
 	my $request = shift;
 	my $client = $request->client;
 
+	my $itemId = $request->getParam('item_id');
+	$request->addParam('_index', 0);
+	# TODO: why do we need to set that
+	$request->addParam('_quantity', 100);
+
+	# if we are descending, no need to search, just get our root
+	if ( defined $itemId ) {
+		my ($key) = $itemId =~ /([^\.]+)/;
+		my $cached = ${$rootFeeds{$key}};
+		$log->error("usin cached feed ==========================", Data::Dump::dump($cached));
+		Slim::Control::XMLBrowser::cliQuery('deezer_browse', $cached, $request);
+		return;
+	}
+
 	my $type = $request->getParam('type');
 	my $id = $request->getParam('id');
 
-	$request->addParam('_index', 0);
-	$request->addParam('_quantity', 10);
+	# this key will prefix each action's hierarchy that JSON will sent us which
+	# allows us to find our back our root feed. During drill-down, that prefix
+	# is removed and XMLBrowser descends the feed.
+	my $key = $client->id =~ s/://gr;
+	$request->addParam('item_id', $key);
 
 	Slim::Control::XMLBrowser::cliQuery('deezer_browse', sub {
 		my ($client, $cb, $args) = @_;
 
-		if ( $type =~ /tracks/ ) {
-		} elsif ( $type =~ /album/ ) {
+		if ( $type =~ /album/ ) {
 
 			getAlbum($client, sub {
-				$cb->($_[0]);
+				my $feed = $_[0];
+				$rootFeeds{$key} = \$feed;
+				$cb->($feed);
 			}, $args, { id => $id } );
-			
+
 		} elsif ( $type =~ /artist/ ) {
-			
+
 			getAPIHandler($client)->artist(sub {
 				my $feed = _renderArtist( $client, $_[0] ) if $_[0];
-
+				$rootFeeds{$key} = \$feed;
+				# no need to add any action, the root 'deezer_browse' is memorized and cliQuery
+				# will provide us with item_id hierarchy. All we need is to know where our root
+				# by prefixing item_id with a min 8-digits length hexa string
+				$log->error(Data::Dump::dump($feed));
 				$cb->($feed);
 			}, $id );
 		}
@@ -1171,10 +1207,10 @@ sub menuBrowse {
 
 sub _menuTrackInfo {
 	my ($api, $cb, $params) = @_;
-	
+
 	my $cache = Slim::Utils::Cache->new;
 	my $id = $params->{id};
-	
+
 	# if we are here, the metadata of the track is cached
 	my $track = $cache->get("deezer_meta_$id");
 	$log->error("metadata not cached for $id") && return [] unless $track;
@@ -1183,13 +1219,11 @@ sub _menuTrackInfo {
 		type => 'link',
 		name =>  $track->{album}->{title},
 		label => 'ALBUM',
-		isContextMenu => 1,
-		refresh => 1,
 		itemActions => {
 			items => {
-					command     => ['deezer_browse', 'items'],
-					fixedParams => { type => 'album', id => $track->{album}->{id} },
-				},
+				command     => ['deezer_browse', 'items'],
+				fixedParams => { type => 'album', id => $track->{album}->{id} },
+			},
 		},
 	}, {
 		type => 'link',
@@ -1197,27 +1231,27 @@ sub _menuTrackInfo {
 		label => 'ARTIST',
 		itemActions => {
 			items => {
-					command     => ['deezer_browse', 'items'],
-					fixedParams => { type => 'artist', id => $track->{artist}->{id} },
-				},
+				command     => ['deezer_browse', 'items'],
+				fixedParams => { type => 'artist', id => $track->{artist}->{id} },
+			},
 		},
 	}, {
 		type => 'text',
 		name => sprintf('%s:%02s', int($track->{duration} / 60), $track->{duration} % 60),
 		label => 'LENGTH',
 	} ];
-	
+
 	$cb->($items, $track->{cover});
 }
 
 sub _menuAlbumInfo {
 	my ($api, $cb, $params) = @_;
-	
+
 	my $id = $params->{id};
-	
+
 	$api->album( sub {
 		my $album = shift;
-		
+
 		my $items = [ {
 			type => 'playlist',
 			name =>  $album->{artist}->{name},
@@ -1245,21 +1279,21 @@ sub _menuAlbumInfo {
 			name => sprintf('%s:%02s', int($album->{duration} / 60), $album->{duration} % 60),
 			label => 'LENGTH',
 		} ];
-		
+
 		my $icon = Plugins::Deezer::API->getImageUrl($album, 'usePlaceholder');
-		$cb->($items, $icon);		
-		
+		$cb->($items, $icon);
+
 	}, $id );
 }
 
 sub _menuArtistInfo {
 	my ($api, $cb, $params) = @_;
-	
+
 	my $id = $params->{id};
-	
+
 	$api->artist( sub {
 		my $artist = shift;
-		
+
 		my $items = [ {
 			type => 'link',
 			name =>  $artist->{name},
@@ -1276,10 +1310,10 @@ sub _menuArtistInfo {
 			name => $artist->{nb_album},
 			label => 'ALBUM',
 		} ];
-		
+
 		my $icon = Plugins::Deezer::API->getImageUrl($artist, 'usePlaceholder');
-		$cb->($items, $icon);		
-		
+		$cb->($items, $icon);
+
 	}, $id );
 }
 
@@ -1287,19 +1321,17 @@ sub _menuPlaylistInfo {
 	my ($api, $cb, $params) = @_;
 
 	my $id = $params->{id};
-	
+
 	$api->playlist( sub {
 		my $playlist = shift;
 
 		my $items = [ {
-			type => 'link',
+			type => 'text',
 			name =>  $playlist->{creator}->{name},
-			url => 'N/A',
 			label => 'ARTIST',
 		},{
-			type => 'link',
+			type => 'text',
 			name =>  $playlist->{title},
-			url => 'N/A',
 			label => 'ALBUM',
 		},{
 			type => 'text',
@@ -1314,10 +1346,10 @@ sub _menuPlaylistInfo {
 			name => sprintf('%02s:%02s:%02s', int($playlist->{duration} / 3600), int(($playlist->{duration} % 3600)/ 60), $playlist->{duration} % 60),
 			label => 'LENGTH',
 		} ];
-		
+
 		my $icon = Plugins::Deezer::API->getImageUrl($playlist, 'usePlaceholder');
-		$cb->($items, $icon);		
-		
+		$cb->($items, $icon);
+
 	}, $id );
 }
 
@@ -1325,8 +1357,8 @@ sub _menuPodcastInfo {
 	my ($api, $cb, $params) = @_;
 
 	my $id = $params->{id};
-	
-=comment	
+
+=comment
 	$api->podcast( sub {
 		my $podcast = shift;
 
@@ -1357,10 +1389,10 @@ sub _menuPodcastInfo {
 			name => sprintf('%02s:%02s:%02s', int($podcast->{duration} / 3600), int(($podcast->{duration} % 3600)/ 60), $podcast->{duration} % 60),
 			label => 'LENGTH',
 		} ];
-		
+
 		my $icon = Plugins::Deezer::API->getImageUrl($podcast, 'usePlaceholder');
-		$cb->($items, $icon);		
-		
+		$cb->($items, $icon);
+
 	}, $id );
 =cut
 	$cb->([]);
