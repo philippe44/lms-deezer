@@ -452,7 +452,7 @@ sub getFlow {
 	my @categories = $mode eq 'genre' ?
 					( 'pop', 'rap', 'rock', 'alternative', 'kpop', 'jazz', 'classical',
 					  'chanson', 'reggae', 'latin', 'soul', 'variete', 'lofi', 'rnb',
-					  'danceedm' ) :
+					  'danceedm', 'empowerment' ) :
 					( 'motivation', 'party', 'chill', 'melancholy', 'you_and_me', 'focus');
 
 	my $items = [ map {
@@ -759,12 +759,12 @@ sub _renderEpisodes {
 sub _renderEpisode {
 	my ($item, $index) = @_;
 
-	# because of the strange way to recover episodes' streaming url, we need to memorize 
+	# because of the strange way to recover episodes' streaming url, we need to memorize
 	# the podcast id and the index in the podcast list of items. It's not great as it not
-	# fool proof for long-term memorization of single episodes (e.g.) in favorites. 
-	# TODO: Try to find a better way to obtain the episode url or rescan the the whole 
+	# fool proof for long-term memorization of single episodes (e.g.) in favorites.
+	# TODO: Try to find a better way to obtain the episode url or rescan the the whole
 	# podcast/episodes until we found the episode's id. For now we'll store all the needed
-	# information in the url. Memorizing the podcast id is not stricly necessary because 
+	# information in the url. Memorizing the podcast id is not stricly necessary because
 	# getting/episode/id will give us podcast id
 	my $url = "deezerpodcast://$item->{podcast_id}/$item->{id}_$index";
 

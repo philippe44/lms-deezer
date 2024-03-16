@@ -285,6 +285,9 @@ PLUGIN_DEEZER_FOCUS
 	EN	Focus
 	FR	Concentration
 
+PLUGIN_DEEZER_EMPOWERMENT
+	EN	Girl Power
+
 PLUGIN_DEEZER_DSTM_SMART_RADIO
 	EN	Deezer Smart Radio
 	FR	Radio Intelligente Deezer
