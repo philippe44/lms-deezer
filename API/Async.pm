@@ -141,18 +141,6 @@ sub track {
 	});
 }
 
-sub episode {
-	my ($self, $cb, $id) = @_;
-
-	$self->_get("/episode/$id", sub {
-		my $episode = shift;
-
-		# even if cachable data are missing, we *want* to cache
-		($episode) = @{Plugins::Deezer::API->cacheEpisodeMetadata( [$episode], { cache => 1 } )} if $episode;
-		$cb->($episode);
-	});
-}
-
 sub artist {
 	my ($self, $cb, $id) = @_;
 
@@ -191,21 +179,6 @@ sub artistRelated {
 	$self->_get("/artist/$id/related", sub {
 		$cb->($_[0]->{data} || []);
 	});
-}
-
-# try to remove duplicates
-# TODO review for Deezer
-sub _filterAlbums {
-	my ($albums) = shift || return;
-	return $albums;
-
-	my %seen;
-	return [ grep {
-		scalar (grep /^LOSSLESS$/, @{$_->{mediaMetadata}->{tags} || []}) && !$seen{$_->{fingerprint}}++
-	} map { {
-			%$_,
-			fingerprint => join(':', $_->{artist}->{id}, $_->{title}, $_->{tracklist}),
-	} } @$albums ];
 }
 
 sub radioTracks {
@@ -289,6 +262,32 @@ sub albumTracks {
 	});
 }
 
+sub podcasts {
+	my ($self, $cb) = @_;
+	$self->_get('/podcast', sub {
+		$cb->($_[0]->{data} || []);
+	});
+}
+
+sub podcast {
+	my ($self, $cb, $id) = @_;
+	$self->_get("/podcast/$id", sub {
+		$cb->($_[0]);
+	});
+}
+
+sub episode {
+	my ($self, $cb, $id) = @_;
+
+	$self->_get("/episode/$id", sub {
+		my $episode = shift;
+
+		# even if cachable data are missing, we *want* to cache
+		($episode) = @{Plugins::Deezer::API->cacheEpisodeMetadata( [$episode], { cache => 1 } )} if $episode;
+		$cb->($episode);
+	});
+}
+
 sub podcastEpisodes {
 	my ($self, $cb, $id, $title) = @_;
 
@@ -303,13 +302,6 @@ sub podcastEpisodes {
 sub radios {
 	my ($self, $cb) = @_;
 	$self->_get('/radio', sub {
-		$cb->($_[0]->{data} || []);
-	});
-}
-
-sub podcasts {
-	my ($self, $cb) = @_;
-	$self->_get('/podcast', sub {
 		$cb->($_[0]->{data} || []);
 	});
 }
@@ -553,6 +545,10 @@ sub getTrackUrl {
 	} );
 }
 
+# getting an episode's url is a bit funny: you can't request by the episode id directly
+# but you need to use the podcast id and an index+count. Caller must know that index and
+# should ask a bit more around it in case something changed.
+
 sub getEpisodesUrl {
 	my ($self, $cb, $podcast, $index, $count) = @_;
 
@@ -580,6 +576,7 @@ sub getEpisodesUrl {
 
 		$self->_ajax( sub {
 			my $result = shift;
+
 			$result = $result->{results}->{EPISODES}->{data} if $result;
 
 			$cb->($result || []);

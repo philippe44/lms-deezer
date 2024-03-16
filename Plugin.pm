@@ -161,6 +161,47 @@ sub postinitPlugin {
 			Plugins::LastMix::Services->registerHandler('Plugins::Deezer::LastMix', 'lossless');
 		}
 	}
+
+	# if user has the Don't Stop The Music plugin enabled, register ourselves
+	if ( Slim::Utils::PluginManager->isEnabled('Slim::Plugin::DontStopTheMusic::Plugin') ) {
+		Slim::Plugin::DontStopTheMusic::Plugin->registerHandler('PLUGIN_DEEZER_DSTM_SMART_RADIO', sub {
+			my ($client, $cb) = @_;
+
+			my $seedTracks = Slim::Plugin::DontStopTheMusic::Plugin->getMixableProperties($client, 50);
+
+			# don't seed from radio stations - only do if we're playing from some track based source
+			if ($seedTracks && ref $seedTracks && scalar @$seedTracks) {
+				main::INFOLOG && $log->info("Creating Deezer Smart Radio from random items in current playlist");
+
+				# get the most frequent artist in our list
+				my %artists;
+
+				foreach (@$seedTracks) {
+					$artists{$_->{artist}}++;
+				}
+
+				# split "feat." etc. artists
+				my @artists;
+				foreach (keys %artists) {
+					if ( my ($a1, $a2) = split(/\s*(?:\&|and|feat\S*)\s*/i, $_) ) {
+						push @artists, $a1, $a2;
+					}
+				}
+
+				unshift @artists, sort { $artists{$b} <=> $artists{$a} } keys %artists;
+
+				dontStopTheMusic($client, $cb, @artists);
+			}
+			else {
+				$cb->($client);
+			}
+		});
+
+		Slim::Plugin::DontStopTheMusic::Plugin->registerHandler('PLUGIN_DEEZER_DSTM_FLOW', sub {
+			$_[1]->($_[0], ['deezer://user/me/flow.dzr']);
+		});
+	}
+
 }
 
 sub onlineLibraryNeedsUpdate {
@@ -471,7 +512,7 @@ sub getPlaylist {
 sub getPodcasts {
 	my ( $client, $cb, $args, $params ) = @_;
 
-	# need to check the "title" issue here which is solved in album
+	# TODO: need to check the "title" issue here which is solved in album
 	getAPIHandler($client)->podcasts(sub {
 		my $items = [ map { _renderGenrePodcast($_) } @{$_[0]} ];
 
@@ -718,15 +759,32 @@ sub _renderEpisodes {
 sub _renderEpisode {
 	my ($item, $index) = @_;
 
+	# because of the strange way to recover episodes' streaming url, we need to memorize 
+	# the podcast id and the index in the podcast list of items. It's not great as it not
+	# fool proof for long-term memorization of single episodes (e.g.) in favorites. 
+	# TODO: Try to find a better way to obtain the episode url or rescan the the whole 
+	# podcast/episodes until we found the episode's id. For now we'll store all the needed
+	# information in the url. Memorizing the podcast id is not stricly necessary because 
+	# getting/episode/id will give us podcast id
 	my $url = "deezerpodcast://$item->{podcast_id}/$item->{id}_$index";
 
 	return {
 		name => $item->{title},
+		type => 'audio',
 		on_select => 'play',
 		playall => 1,
 		play => $url,
 		url => $url,
 		image => $item->{cover},
+		itemActions => {
+			info => {
+				command   => ['deezer_info', 'items'],
+				fixedParams => {
+					type => 'episodes',
+					id => $item->{id},
+				},
+			},
+		},
 	};
 }
 
@@ -1123,6 +1181,8 @@ sub menuInfoWeb {
 				$method = \&_menuPlaylistInfo;
 			} elsif ( $type =~ /podcasts/ ) {
 				$method = \&_menuPodcastInfo;
+			} elsif ( $type =~ /episodes/ ) {
+				$method = \&_menuEpisodeInfo;
 			}
 
 			$method->( $api, sub {
@@ -1239,7 +1299,12 @@ sub _menuTrackInfo {
 		type => 'text',
 		name => sprintf('%s:%02s', int($track->{duration} / 60), $track->{duration} % 60),
 		label => 'LENGTH',
-	} ];
+	}, {
+			type  => 'text',
+			name  => $track->{link},
+			label => 'URL',
+			parseURLs => 1
+		} ];
 
 	$cb->($items, $track->{cover});
 }
@@ -1278,6 +1343,11 @@ sub _menuAlbumInfo {
 			type => 'text',
 			name => sprintf('%s:%02s', int($album->{duration} / 60), $album->{duration} % 60),
 			label => 'LENGTH',
+		}, {
+			type  => 'text',
+			name  => $album->{link},
+			label => 'URL',
+			parseURLs => 1
 		} ];
 
 		my $icon = Plugins::Deezer::API->getImageUrl($album, 'usePlaceholder');
@@ -1309,6 +1379,11 @@ sub _menuArtistInfo {
 			type => 'text',
 			name => $artist->{nb_album},
 			label => 'ALBUM',
+		}, {
+			type  => 'text',
+			name  => $artist->{link},
+			label => 'URL',
+			parseURLs => 1
 		} ];
 
 		my $icon = Plugins::Deezer::API->getImageUrl($artist, 'usePlaceholder');
@@ -1329,11 +1404,11 @@ sub _menuPlaylistInfo {
 			type => 'text',
 			name =>  $playlist->{creator}->{name},
 			label => 'ARTIST',
-		},{
+		}, {
 			type => 'text',
 			name =>  $playlist->{title},
 			label => 'ALBUM',
-		},{
+		}, {
 			type => 'text',
 			name => $playlist->{nb_tracks} || 0,
 			label => 'TRACK_NUMBER',
@@ -1345,6 +1420,11 @@ sub _menuPlaylistInfo {
 			type => 'text',
 			name => sprintf('%02s:%02s:%02s', int($playlist->{duration} / 3600), int(($playlist->{duration} % 3600)/ 60), $playlist->{duration} % 60),
 			label => 'LENGTH',
+		}, {
+			type  => 'text',
+			name  => $playlist->{link},
+			label => 'URL',
+			parseURLs => 1
 		} ];
 
 		my $icon = Plugins::Deezer::API->getImageUrl($playlist, 'usePlaceholder');
@@ -1358,44 +1438,101 @@ sub _menuPodcastInfo {
 
 	my $id = $params->{id};
 
-=comment
 	$api->podcast( sub {
 		my $podcast = shift;
 
 		my $items = [ {
-			type => 'link',
-			name =>  $podcast->{creator}->{name},
-			url => 'N/A',
-			label => 'ARTIST',
-			# needs actions to display a link
-			#actions => ...
-		},{
-			type => 'link',
+			type => 'text',
 			name =>  $podcast->{title},
-			url => 'N/A',
-			label => 'ALBUM',
-			# needs actions to display a link
-			#actions => ...
-		},{
-			type => 'text',
-			name => $podcast->{nb_tracks} || 0,
-			label => 'TRACK_NUMBER',
+			label => 'TITLE',
+		}, {
+			type  => 'text',
+			name  => $podcast->{link},
+			label => 'URL',
+			parseURLs => 1
 		}, {
 			type => 'text',
-			name => substr($podcast->{creation_date}, 0, 4),
-			label => 'YEAR',
-		}, {
-			type => 'text',
-			name => sprintf('%02s:%02s:%02s', int($podcast->{duration} / 3600), int(($podcast->{duration} % 3600)/ 60), $podcast->{duration} % 60),
-			label => 'LENGTH',
+			name => $podcast->{description},
+			label => 'COMMENT',
+			parseURLs => 1
 		} ];
 
 		my $icon = Plugins::Deezer::API->getImageUrl($podcast, 'usePlaceholder');
 		$cb->($items, $icon);
 
 	}, $id );
-=cut
-	$cb->([]);
+}
+
+sub _menuEpisodeInfo {
+	my ($api, $cb, $params) = @_;
+
+	my $cache = Slim::Utils::Cache->new;
+	my $id = $params->{id};
+
+	# unlike tracks, we miss some information when drilling down on podcast episodes
+	$api->episode( sub {
+		my $episode = shift;
+
+		my $items = [ {
+			type => 'text',
+			name =>  $episode->{title},
+			label => 'TITLE',
+		}, {
+			type => 'text',
+			name => sprintf('%02s:%02s:%02s', int($episode->{duration} / 3600), int(($episode->{duration} % 3600)/ 60), $episode->{duration} % 60),
+			label => 'LENGTH',
+		}, {
+			type => 'text',
+			label => 'MODTIME',
+			name => $episode->{date},
+		}, {
+			type  => 'text',
+			name  => $episode->{link},
+			label => 'URL',
+			parseURLs => 1
+		}, {
+			type => 'text',
+			name => $episode->{comment},
+			label => 'COMMENT',
+			parseURLs => 1
+		}, ];
+
+		$cb->($items, $episode->{picture});
+	}, $id );
+}
+
+sub dontStopTheMusic {
+	my $client  = shift;
+	my $cb      = shift;
+	my $nextArtist = shift;
+	my @artists = @_;
+
+	if ($nextArtist) {
+		getAPIHandler($client)->search(sub {
+			my $artists = shift || [];
+
+			my ($track) = map {
+				"deezer://artist/$_->{id}/radio.dzr"
+			} grep {
+				$_->{radio}
+			} @$artists;
+
+			if ($track) {
+				$cb->($client, [$track]);
+			}
+			else {
+				dontStopTheMusic($client, $cb, @artists);
+			}
+		},{
+			search => $nextArtist,
+			type => 'artist',
+			# strict => 'off'
+		});
+	}
+	else {
+		main::INFOLOG && $log->is_info && $log->info("No matching Smart Radio found for current playlist!");
+		$cb->($client);
+	}
 }
 
 

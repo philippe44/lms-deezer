@@ -131,6 +131,7 @@ sub cacheTrackMetadata {
 			replay_gain => $entry->{gain} || 0,
 			disc => $entry->{disk_number},
 			tracknum => $entry->{track_position},
+			link => $entry->{link},
 		};
 		
 		# make sure we won't come back
@@ -164,6 +165,9 @@ sub cacheEpisodeMetadata {
 			duration => $entry->{duration},
 			icon => $icon,
 			cover => $icon,
+			link => $entry->{link},
+			comment => $entry->{description},
+			date => substr($entry->{release_date}, 0, 10),
 		};
 		
 		# make sure we won't come back

@@ -485,6 +485,7 @@ sub getMetadataFor {
 
 	# when trying to get metadata for a radio/flow, we must be playing it
 	if ( _getRadio($url) || _getFlow($url) ) {
+		$defaultMeta->{title} = cstring($client, 'PLUGIN_DEEZER_DSTM_SMART_RADIO');
 		return $defaultMeta unless $song && $song->track->url eq $url;
 
 		$trackId = $song->pluginData('trackId');
