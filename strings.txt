@@ -230,10 +230,12 @@ PLUGIN_DEEZER_JAZZ
 	EN	Jazz
 
 PLUGIN_DEEZER_CLASSICAL
+	DE	Klassische Musik
 	EN	Classical
 	FR	Classique
 
 PLUGIN_DEEZER_CHANSON
+	DE	Chanson
 	EN	Songs
 	FR	Chansons
 
@@ -249,6 +251,7 @@ PLUGIN_DEEZER_SOUL
 	FR	Soul & Funk
 
 PLUGIN_DEEZER_VARIETE
+	DE	Französische Popmusik
 	EN	French Pop
 	FR	Variété française
 
@@ -263,6 +266,7 @@ PLUGIN_DEEZER_DANCEEDM
 	EN	Dance & EDM
 
 PLUGIN_DEEZER_MOTIVATION
+	DE	Workout
 	EN	Motivation
 
 PLUGIN_DEEZER_PARTY
@@ -274,14 +278,17 @@ PLUGIN_DEEZER_CHILL
 	FR	Détente
 
 PLUGIN_DEEZER_MELANCHOLY
+	DE	Traurig
 	EN	Melancholy
 	FR	Melancolie
 
 PLUGIN_DEEZER_YOU_AND_ME
+	DE	Liebe
 	EN	Love
 	FR	Romance
 
 PLUGIN_DEEZER_FOCUS
+	DE	Fokus
 	EN	Focus
 	FR	Concentration
 
