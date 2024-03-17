@@ -71,7 +71,7 @@ sub getQuality {
 sub getImageUrl {
 	my ($class, $data, $usePlaceholder, $type) = @_;
 
-	if ( my $coverId = $data->{md5_image} || $data->{picture_big} || $data->{picture_medium} || $data->{picture} || ($data->{album} && $data->{album}->{cover}) ) {
+	if ( my $coverId = $data->{md5_image} || $data->{picture_big} || $data->{picture_medium} || $data->{picture} || (ref $data->{album} && $data->{album}->{cover}) ) {
 
 		return $data->{cover} = $coverId if $coverId =~ /^https?:/;
 
@@ -150,7 +150,7 @@ sub cacheEpisodeMetadata {
 	
 	return [] unless $episodes;
 	$params ||= {};
-	
+
 	return [ map {
 		my $entry = $_;
 		my $oldMeta = $cache->get( 'deezer_episode_meta_' . $entry->{id}) || {};
@@ -161,7 +161,7 @@ sub cacheEpisodeMetadata {
 			%$oldMeta,
 			id => $entry->{id},
 			title => $entry->{title},
-			album => $entry->{podcast} ? $entry->{podcast}->{title} : $params->{podcast},
+			podcast => $entry->{podcast} || $params->{podcast},
 			duration => $entry->{duration},
 			icon => $icon,
 			cover => $icon,

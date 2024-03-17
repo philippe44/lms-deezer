@@ -148,8 +148,11 @@ sub getMetadataFor {
 	my $meta = $cache->get('deezer_episode_meta_' . $id);
 
 	# if metadata is in cache and is full
-	return $meta if $meta && $meta->{_complete};
-
+	if ( $meta && $meta->{_complete} ) {
+		$meta->{album} = $meta->{podcast}->{title} if ref $meta->{podcast};	
+		return $meta;
+	}	
+	
 	my $now = time();
 
 	# first cleanup old requests in case some got lost

@@ -289,11 +289,11 @@ sub episode {
 }
 
 sub podcastEpisodes {
-	my ($self, $cb, $id, $title) = @_;
+	my ($self, $cb, $id, $podcast) = @_;
 
 	$self->_get("/podcast/$id/episodes", sub {
-		my $podcast = shift;
-		my $episodes = Plugins::Deezer::API->cacheEpisodeMetadata($podcast->{data}, { podcast => $title } ) if $podcast;
+		my $episodes = shift;
+		$episodes = Plugins::Deezer::API->cacheEpisodeMetadata($episodes->{data}, { podcast => $podcast } ) if $episodes;
 
 		$cb->($episodes || []);
 	}, { _ttl => USER_CONTENT_TTL } );

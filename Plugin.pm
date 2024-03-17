@@ -135,6 +135,46 @@ sub initPlugin {
 sub postinitPlugin {
 	my $class = shift;
 
+	# if user has the Don't Stop The Music plugin enabled, register ourselves
+	if ( Slim::Utils::PluginManager->isEnabled('Slim::Plugin::DontStopTheMusic::Plugin') ) {
+		Slim::Plugin::DontStopTheMusic::Plugin->registerHandler('PLUGIN_DEEZER_DSTM_SMART_RADIO', sub {
+			my ($client, $cb) = @_;
+
+			my $seedTracks = Slim::Plugin::DontStopTheMusic::Plugin->getMixableProperties($client, 50);
+
+			# don't seed from radio stations - only do if we're playing from some track based source
+			if ($seedTracks && ref $seedTracks && scalar @$seedTracks) {
+				main::INFOLOG && $log->info("Creating Deezer Smart Radio from random items in current playlist");
+
+				# get the most frequent artist in our list
+				my %artists;
+
+				foreach (@$seedTracks) {
+					$artists{$_->{artist}}++;
+				}
+
+				# split "feat." etc. artists
+				my @artists;
+				foreach (keys %artists) {
+					if ( my ($a1, $a2) = split(/\s*(?:\&|and|feat\S*)\s*/i, $_) ) {
+						push @artists, $a1, $a2;
+					}
+				}
+
+				unshift @artists, sort { $artists{$b} <=> $artists{$a} } keys %artists;
+
+				dontStopTheMusic($client, $cb, @artists);
+			}
+			else {
+				$cb->($client);
+			}
+		});
+
+		Slim::Plugin::DontStopTheMusic::Plugin->registerHandler('PLUGIN_DEEZER_DSTM_FLOW', sub {
+			$_[1]->($_[0], ['deezer://user/me/flow.dzr']);
+		});
+	}
+
 	if ( Slim::Utils::PluginManager->isEnabled('Slim::Plugin::OnlineLibrary::Plugin') ) {
 		Slim::Plugin::OnlineLibrary::Plugin->addLibraryIconProvider('deezer', '/plugins/Deezer/html/logo.png');
 
@@ -512,7 +552,6 @@ sub getPlaylist {
 sub getPodcasts {
 	my ( $client, $cb, $args, $params ) = @_;
 
-	# TODO: need to check the "title" issue here which is solved in album
 	getAPIHandler($client)->podcasts(sub {
 		my $items = [ map { _renderGenrePodcast($_) } @{$_[0]} ];
 
@@ -523,18 +562,17 @@ sub getPodcasts {
 		};
 
 		$cb->( { items => $items } );
-	}, $params->{id}, $params->{title} );
+	});
 }
 
 sub getPodcastEpisodes {
 	my ( $client, $cb, $args, $params ) = @_;
 
 	getAPIHandler($client)->podcastEpisodes(sub {
-		my $items = [ map { { %$_, podcast_id => $params->{id} } } @{$_[0]} ];
-		$items = _renderEpisodes($items);
+		my $items = _renderEpisodes($_[0]);
 
 		$cb->( { items => $items } );
-	}, $params->{id}, $params->{title} );
+	}, $params->{id}, $params->{podcast} );
 
 }
 
@@ -742,7 +780,7 @@ sub _renderPodcast {
 		image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder'),
 		passthrough => [ {
 			id => $item->{id},
-			title => $item->{title},
+			podcast => $item,
 		} ],
 	};
 }
@@ -759,14 +797,14 @@ sub _renderEpisodes {
 sub _renderEpisode {
 	my ($item, $index) = @_;
 
-	# because of the strange way to recover episodes' streaming url, we need to memorize 
+	# because of the strange way to recover episodes' streaming url, we need to memorize
 	# the podcast id and the index in the podcast list of items. It's not great as it not
-	# fool proof for long-term memorization of single episodes (e.g.) in favorites. 
-	# TODO: Try to find a better way to obtain the episode url or rescan the the whole 
+	# fool proof for long-term memorization of single episodes (e.g.) in favorites.
+	# TODO: Try to find a better way to obtain the episode url or rescan the the whole
 	# podcast/episodes until we found the episode's id. For now we'll store all the needed
-	# information in the url. Memorizing the podcast id is not stricly necessary because 
+	# information in the url. Memorizing the podcast id is not stricly necessary because
 	# getting/episode/id will give us podcast id
-	my $url = "deezerpodcast://$item->{podcast_id}/$item->{id}_$index";
+	my $url = "deezerpodcast://$item->{podcast}->{id}/$item->{id}_$index";
 
 	return {
 		name => $item->{title},
@@ -1111,7 +1149,7 @@ sub menuInfoWeb {
 	my $type = $request->getParam('type');
 	my $id = $request->getParam('id');
 
-#$log->error("IN INFOWEB !!!!!!!!!!!!!!!!!!!!!");
+#$log->error("IN INFOWEB !!!!!!!!!!!!!!!!!!!!! ", Data::Dump::dump($request));
 	$request->addParam('_index', 0);
 	$request->addParam('_quantity', 10);
 
@@ -1185,9 +1223,9 @@ sub menuInfoWeb {
 				$method = \&_menuEpisodeInfo;
 			}
 
-			$method->( $api, sub {
+			$method->( $api, $item, sub {
 				my ($items, $icon) = @_;
-				unshift @$items, $item;
+#$log->error("THIS IS WHAT WE RETURN TO CLIQUERY", Data::Dump::dump($items));
 				$cb->( {
 					type  => 'opml',
 					#menuComplete => 1,
@@ -1214,28 +1252,36 @@ sub menuInfoJive {
 
 sub menuBrowse {
 	my $request = shift;
+
 	my $client = $request->client;
 
 	my $itemId = $request->getParam('item_id');
+	my $type = $request->getParam('type');
+	my $id = $request->getParam('id');
+
 	$request->addParam('_index', 0);
 	# TODO: why do we need to set that
-	$request->addParam('_quantity', 100);
+	$request->addParam('_quantity', 200);
+
+	main::INFOLOG && $log->is_info && $log->info("Browsing for item_id:$itemId or type:$type:$id");
 
 	# if we are descending, no need to search, just get our root
 	if ( defined $itemId ) {
 		my ($key) = $itemId =~ /([^\.]+)/;
 		my $cached = ${$rootFeeds{$key}};
-		$log->error("usin cached feed ==========================", Data::Dump::dump($cached));
+#$log->error("usin cached feed ==========================", Data::Dump::dump($cached));
 		Slim::Control::XMLBrowser::cliQuery('deezer_browse', $cached, $request);
 		return;
 	}
 
-	my $type = $request->getParam('type');
-	my $id = $request->getParam('id');
-
 	# this key will prefix each action's hierarchy that JSON will sent us which
 	# allows us to find our back our root feed. During drill-down, that prefix
 	# is removed and XMLBrowser descends the feed.
+	# ideally, we would like to not have to do that but that means we leave some
+	# breadcrums *before* we arrive here, in the _renderXXX familiy but I don't
+	# know how so we have to build our own "fake" dispatch just for that
+	# we only need to do that when we have to redescend further that hierarchy,
+	# not when it's one shot
 	my $key = $client->id =~ s/://gr;
 	$request->addParam('item_id', $key);
 
@@ -1258,24 +1304,62 @@ sub menuBrowse {
 				# no need to add any action, the root 'deezer_browse' is memorized and cliQuery
 				# will provide us with item_id hierarchy. All we need is to know where our root
 				# by prefixing item_id with a min 8-digits length hexa string
-				$log->error(Data::Dump::dump($feed));
 				$cb->($feed);
 			}, $id );
+
+		} elsif ( $type =~ /playlist/ ) {
+
+			# we don't need to memorize the feed as we won't redescend into it
+			getPlaylist($client, $cb, $args, { id => $id } );
+
+		} elsif ( $type =~ /track/ ) {
+
+			# track must be in cache, no memorizing
+			my $cache = Slim::Utils::Cache->new;
+			my $track = _renderTrack($cache->get('deezer_meta_' . $id));
+			$cb->([$track]);
+
+		} elsif ( $type =~ /podcast/ ) {
+
+			# we need to re-acquire the podcast itself
+			getAPIHandler($client)->podcast(sub {
+				my $podcast = shift;
+				getPodcastEpisodes($client, $cb, $args, {
+					id => $id,
+					podcast => $podcast,
+				} );
+			}, $id );
+
+		} elsif ( $type =~ /episode/ ) {
+
+			# track must be in cache, no memorizing
+			my $cache = Slim::Utils::Cache->new;
+			my $episode = _renderEpisode($cache->get('deezer_episode_meta_' . $id));
+			$cb->([$episode]);
+
 		}
 	}, $request );
 }
 
 sub _menuTrackInfo {
-	my ($api, $cb, $params) = @_;
+	my ($api, $item, $cb, $params) = @_;
 
 	my $cache = Slim::Utils::Cache->new;
 	my $id = $params->{id};
+	my $items = [];
 
 	# if we are here, the metadata of the track is cached
 	my $track = $cache->get("deezer_meta_$id");
 	$log->error("metadata not cached for $id") && return [] unless $track;
 
-	my $items = [ {
+	# play/add/add_next options except for skins that don't want it
+	push @$items, (
+		_menuPlay($api->client, 'track', $track->{id}, $params->{menu}),
+		_menuAdd($api->client, 'track', $track->{id}, 'insert', 'PLAY_NEXT', $params->{menu}),
+		_menuAdd($api->client, 'track', $track->{id}, 'add', 'ADD_TO_END', $params->{menu})
+	) if $params->{useContextMenu} || $params->{feedMode};
+
+	push @$items, ( $item, {
 		type => 'link',
 		name =>  $track->{album}->{title},
 		label => 'ALBUM',
@@ -1300,24 +1384,76 @@ sub _menuTrackInfo {
 		name => sprintf('%s:%02s', int($track->{duration} / 60), $track->{duration} % 60),
 		label => 'LENGTH',
 	}, {
-			type  => 'text',
-			name  => $track->{link},
-			label => 'URL',
-			parseURLs => 1
-		} ];
+		type  => 'text',
+		name  => $track->{link},
+		label => 'URL',
+		parseURLs => 1
+	} );
 
 	$cb->($items, $track->{cover});
 }
 
+sub _menuAdd {
+	my ($client, $type, $id, $cmd, $title, $menuMode) = @_;
+
+	my $actions = {
+			items => {
+				command     => [ 'deezer_browse', 'playlist', $cmd ],
+				fixedParams => { type => $type, id => $id },
+			},
+		};
+
+	$actions->{'play'} = $actions->{'items'};
+	$actions->{'add'}  = $actions->{'items'};
+
+	return {
+		itemActions => $actions,
+		nextWindow  => 'parent',
+		type        => $menuMode ? 'text' : 'link',
+		playcontrol => $cmd,
+		name        => cstring($client, $title),
+	};
+}
+
+sub _menuPlay {
+	my ($client, $type, $id, $menuMode) = @_;
+
+	my $actions = {
+			items => {
+				command     => [ 'deezer_browse', 'playlist', 'load' ],
+				fixedParams => { type => $type, id => $id },
+			},
+		};
+
+	$actions->{'play'} = $actions->{'items'};
+
+	return {
+		itemActions => $actions,
+		nextWindow  => 'nowPlaying',
+		type        => $menuMode ? 'text' : 'link',
+		playcontrol => 'play',
+		name        => cstring($client, 'PLAY'),
+	};
+}
+
 sub _menuAlbumInfo {
-	my ($api, $cb, $params) = @_;
+	my ($api, $item, $cb, $params) = @_;
 
 	my $id = $params->{id};
 
 	$api->album( sub {
 		my $album = shift;
 
-		my $items = [ {
+		my $items = [];
+
+		# play/add/add_next options except for skins that don't want it
+		push @$items, (
+			_menuPlay($api->client, 'album', $id, $params->{menu}),
+			_menuAdd($api->client, 'album', $id, 'insert', 'PLAY_NEXT', $params->{menu}),
+			_menuAdd($api->client, 'album', $id, 'add', 'ADD_TO_END', $params->{menu})
+		) if $params->{useContextMenu} || $params->{feedMode};
+
+		push @$items, ( $item, {
 			type => 'playlist',
 			name =>  $album->{artist}->{name},
 			label => 'ARTIST',
@@ -1348,7 +1484,7 @@ sub _menuAlbumInfo {
 			name  => $album->{link},
 			label => 'URL',
 			parseURLs => 1
-		} ];
+		} );
 
 		my $icon = Plugins::Deezer::API->getImageUrl($album, 'usePlaceholder');
 		$cb->($items, $icon);
@@ -1357,14 +1493,14 @@ sub _menuAlbumInfo {
 }
 
 sub _menuArtistInfo {
-	my ($api, $cb, $params) = @_;
+	my ($api, $item, $cb, $params) = @_;
 
 	my $id = $params->{id};
 
 	$api->artist( sub {
 		my $artist = shift;
 
-		my $items = [ {
+		my $items = [ $item, {
 			type => 'link',
 			name =>  $artist->{name},
 			url => 'N/A',
@@ -1393,14 +1529,23 @@ sub _menuArtistInfo {
 }
 
 sub _menuPlaylistInfo {
-	my ($api, $cb, $params) = @_;
+	my ($api, $item, $cb, $params) = @_;
 
 	my $id = $params->{id};
 
 	$api->playlist( sub {
 		my $playlist = shift;
 
-		my $items = [ {
+		my $items = [];
+
+		# play/add/add_next options except for skins that don't want it
+		push @$items, (
+			_menuPlay($api->client, 'playlist', $id, $params->{menu}),
+			_menuAdd($api->client, 'playlist', $id, 'insert', 'PLAY_NEXT', $params->{menu}),
+			_menuAdd($api->client, 'playlist', $id, 'add', 'ADD_TO_END', $params->{menu})
+		) if $params->{useContextMenu} || $params->{feedMode};
+
+		push @$items, ( $item, {
 			type => 'text',
 			name =>  $playlist->{creator}->{name},
 			label => 'ARTIST',
@@ -1425,7 +1570,7 @@ sub _menuPlaylistInfo {
 			name  => $playlist->{link},
 			label => 'URL',
 			parseURLs => 1
-		} ];
+		} );
 
 		my $icon = Plugins::Deezer::API->getImageUrl($playlist, 'usePlaceholder');
 		$cb->($items, $icon);
@@ -1434,17 +1579,27 @@ sub _menuPlaylistInfo {
 }
 
 sub _menuPodcastInfo {
-	my ($api, $cb, $params) = @_;
+	my ($api, $item, $cb, $params) = @_;
 
 	my $id = $params->{id};
 
 	$api->podcast( sub {
 		my $podcast = shift;
 
-		my $items = [ {
+		my $items = [];
+
+		# play/add/add_next options except for skins that don't want it
+		push @$items, (
+			_menuPlay($api->client, 'podcast', $id, $params->{menu}),
+			_menuAdd($api->client, 'podcast', $id, 'insert', 'PLAY_NEXT', $params->{menu}),
+			_menuAdd($api->client, 'podcast', $id, 'add', 'ADD_TO_END', $params->{menu})
+		) if $params->{useContextMenu} || $params->{feedMode};
+
+		push @$items, ( $item, {
+			# put that one as an "album" otherwise control icons won't appear
 			type => 'text',
 			name =>  $podcast->{title},
-			label => 'TITLE',
+			label => 'ALBUM',
 		}, {
 			type  => 'text',
 			name  => $podcast->{link},
@@ -1455,7 +1610,7 @@ sub _menuPodcastInfo {
 			name => $podcast->{description},
 			label => 'COMMENT',
 			parseURLs => 1
-		} ];
+		} );
 
 		my $icon = Plugins::Deezer::API->getImageUrl($podcast, 'usePlaceholder');
 		$cb->($items, $icon);
@@ -1464,7 +1619,7 @@ sub _menuPodcastInfo {
 }
 
 sub _menuEpisodeInfo {
-	my ($api, $cb, $params) = @_;
+	my ($api, $item, $cb, $params) = @_;
 
 	my $cache = Slim::Utils::Cache->new;
 	my $id = $params->{id};
@@ -1473,7 +1628,21 @@ sub _menuEpisodeInfo {
 	$api->episode( sub {
 		my $episode = shift;
 
-		my $items = [ {
+		my $items = [];
+
+		# play/add/add_next options except for skins that don't want it
+		push @$items, (
+			_menuPlay($api->client, 'episode', $id, $params->{menu}),
+			_menuAdd($api->client, 'episode', $id, 'insert', 'PLAY_NEXT', $params->{menu}),
+			_menuAdd($api->client, 'episode', $id, 'add', 'ADD_TO_END', $params->{menu})
+		) if $params->{useContextMenu} || $params->{feedMode};
+
+		push @$items, ( $item, {
+			# put that one as an "album" otherwise control icons won't appear
+			type => 'text',
+			name =>  $episode->{podcast}->{title},
+			label => 'ALBUM',
+		}, {
 			type => 'text',
 			name =>  $episode->{title},
 			label => 'TITLE',
@@ -1495,10 +1664,46 @@ sub _menuEpisodeInfo {
 			name => $episode->{comment},
 			label => 'COMMENT',
 			parseURLs => 1
-		}, ];
+		} );
 
-		$cb->($items, $episode->{picture});
+		my $icon = Plugins::Deezer::API->getImageUrl($episode, 'usePlaceholder');
+		$cb->($items, $icon);
+
 	}, $id );
+}
+
+sub dontStopTheMusic {
+	my $client  = shift;
+	my $cb      = shift;
+	my $nextArtist = shift;
+	my @artists = @_;
+
+	if ($nextArtist) {
+		getAPIHandler($client)->search(sub {
+			my $artists = shift || [];
+
+			my ($track) = map {
+				"deezer://artist/$_->{id}/radio.dzr"
+			} grep {
+				$_->{radio}
+			} @$artists;
+
+			if ($track) {
+				$cb->($client, [$track]);
+			}
+			else {
+				dontStopTheMusic($client, $cb, @artists);
+			}
+		},{
+			search => $nextArtist,
+			type => 'artist',
+			# strict => 'off'
+		});
+	}
+	else {
+		main::INFOLOG && $log->is_info && $log->info("No matching Smart Radio found for current playlist!");
+		$cb->($client);
+	}
 }
 
 sub dontStopTheMusic {
