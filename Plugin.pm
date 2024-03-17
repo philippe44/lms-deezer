@@ -492,7 +492,7 @@ sub getFlow {
 	my @categories = $mode eq 'genre' ?
 					( 'pop', 'rap', 'rock', 'alternative', 'kpop', 'jazz', 'classical',
 					  'chanson', 'reggae', 'latin', 'soul', 'variete', 'lofi', 'rnb',
-					  'danceedm' ) :
+					  'danceedm', 'empowerment' ) :
 					( 'motivation', 'party', 'chill', 'melancholy', 'you_and_me', 'focus');
 
 	my $items = [ map {
