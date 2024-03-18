@@ -97,6 +97,9 @@ sub typeOfItem {
 	if ( $item->{type} && $item->{type} =~ /(?:playlist|artist|album|track|radio|genre|podcast|episode)/i ) {
 		return $item->{type};
 	}
+	elsif ( $item->{podcast} ) {
+		return 'episode';
+	}
 	elsif ( $item->{duration} ) {
 		return 'track';
 	}

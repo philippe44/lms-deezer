@@ -23,7 +23,7 @@ my $cache = Slim::Utils::Cache->new;
 # https://www.deezer.com/episode/611754312
 # is there a link for podcast?
 my $URL_REGEX = qr{^https://(?:\w+\.)?deezer.com/(episode)/([a-z\d-]+)}i;
-my $URI_REGEX = qr{^deezerpodcast://(\d+)\/(\d+)(?:_(\d+))}i;
+my $URI_REGEX = qr{^deezerpodcast://(\d+)}i;
 Slim::Player::ProtocolHandlers->registerURLHandler($URL_REGEX, __PACKAGE__);
 Slim::Player::ProtocolHandlers->registerURLHandler($URI_REGEX, __PACKAGE__);
 
@@ -58,18 +58,12 @@ sub audioScrobblerSource {
 sub explodePlaylist {
 	my ( $class, $client, $url, $cb ) = @_;
 
-	my ($type, $id) = $url =~ $URL_REGEX;
-
-	if ( !($type && $id) ) {
-		($type, $id) = $url =~ $URI_REGEX;
-	}
-
-	if ($id) {
-		main::INFOLOG && $log->is_info && $log->info("Getting $url, type:$type, id:$id");
-		return $cb->( [ $url ] );
-	} else {
-		$cb->([]);
-	}
+	my ($id) = $url =~ $URL_REGEX;
+	($id) = $url =~ $URI_REGEX unless $id;
+	return $cb->() unless $id;
+	
+	main::INFOLOG && $log->is_info && $log->info("Getting $url id:$id");
+	return $cb->( [ $url ] );
 }
 
 sub getNextTrack {
@@ -77,17 +71,13 @@ sub getNextTrack {
 
 	my $client = $song->master();
 	my $url = $song->track->url;
-	my ($podcast, $episode, $index) = _getId($url);
+	my $id = _getId($url);
 	
 	Plugins::Deezer::Plugin::getAPIHandler($client)->getEpisodesUrl( sub {
-		my $results = shift;
-		return $errorCb->($@) unless $results && @$results;
+		my $result = shift;
+		return $errorCb->($@) unless $result;
 		
-		# was ask for more than one track in case more have been added since
-		my ($entry) = grep { $_->{EPISODE_ID} == $episode } @$results;
-		return $errorCb->("can't find track") unless $entry;
-		
-		my $streamUrl = $entry->{EPISODE_DIRECT_STREAM_URL};
+		my $streamUrl = $result->{EPISODE_DIRECT_STREAM_URL};
 		$song->streamUrl($streamUrl);		
 		my $format = $class->formatOverride($song);
 		
@@ -111,7 +101,7 @@ sub getNextTrack {
 				$successCb->();
 			}
 		);
-	}, $podcast, $index, 4 );
+	}, $id );
 }
 
 =comment
@@ -140,8 +130,8 @@ sub getMetadataFor {
 		cover     => $icon,
 	};
 
-	my ($podcast, $episode) = _getId($url);
-	return $defaultMeta unless $podcast && $episode;
+	my $episode = _getId($url);
+	return $defaultMeta unless $episode;
 
 	# episode identifier is unique across podcasts
 	my $id = $episode;
@@ -166,7 +156,7 @@ sub getMetadataFor {
 			time => $now,
 		};
 
-		main::DEBUGLOG && $log->is_debug && $log->debug("adding metadata query for $podcast:$episode");
+		main::DEBUGLOG && $log->is_debug && $log->debug("adding metadata query for $episode");
 
 		Plugins::Deezer::Plugin::getAPIHandler($client)->episode(sub {
 			my $meta = shift;
@@ -187,7 +177,8 @@ sub getMetadataFor {
 }
 
 sub _getId {
-	return $_[0] =~ m|deezerpodcast://(\d+)/(\d+)(?:_(\d+))?|;
+	my ($id) = $_[0] =~ m|deezerpodcast://(\d+)|;
+	return $id;
 }
 
 

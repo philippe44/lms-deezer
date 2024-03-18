@@ -545,39 +545,28 @@ sub getTrackUrl {
 	} );
 }
 
-# getting an episode's url is a bit funny: you can't request by the episode id directly
-# but you need to use the podcast id and an index+count. Caller must know that index and
-# should ask a bit more around it in case something changed.
-
 sub getEpisodesUrl {
-	my ($self, $cb, $podcast, $index, $count) = @_;
+	my ($self, $cb, $id) = @_;
 
 	$self->_getUserContext( sub {
 		my ($tokens, $mode) = @_;
 		return $cb->() unless $tokens;
 
 		my $args = {
-			method => 'deezer.pageShow',
+			method => 'episode.getData',
 			api_token => $tokens->{csrf},
 			_contentType => 'application/json',
 			_cookies => $mode,
 		};
 
-		my $accounts = $prefs->get('accounts');
-
 		my $content = encode_json( {
-			show_id => $podcast,
-			country => $accounts->{$self->userId}->{country},
-			lang => lc(preferences('server')->get('language')),
-			nb => $count || 1,
-			start => $index || 0,
-			user_id => $self->userId,
+			episode_id => $id,
 		} );
 
 		$self->_ajax( sub {
 			my $result = shift;
 
-			$result = $result->{results}->{EPISODES}->{data} if $result;
+			$result = $result->{results} if $result;
 
 			$cb->($result || []);
 		}, $args, $content);
