@@ -429,7 +429,7 @@ sub getArtistAlbums {
 	my ( $client, $cb, $args, $params ) = @_;
 
 	getAPIHandler($client)->artistAlbums(sub {
-		my $items = _renderAlbums(@_);
+		my $items = _renderAlbums(@_, { artist => $params->{name} });
 
 		# the action can be there or in the sub-item as an itemActions
 		$cb->( { items => $items } );
@@ -649,25 +649,25 @@ sub _renderPlaylist {
 }
 
 sub _renderAlbums {
-	my ($results, $addArtistToTitle) = @_;
+	my ($results, $args) = @_;
 
 	return [ map {
-		_renderAlbum($_, $addArtistToTitle);
+		_renderAlbum($_, $args->{addArtistToTitle}, $args->{artist});
 	} @$results ];
 }
 
 sub _renderAlbum {
-	my ($item, $addArtistToTitle) = @_;
+	my ($item, $addArtistToTitle, $artist) = @_;
 
 	my $title = $item->{title};
-	$title .= ' - ' . $item->{artist}->{name} if $addArtistToTitle;
+	$title .= ' - ' . ($item->{artist}->{name} || $artist) if $addArtistToTitle;
 
 	return {
 		name => $title,
 		line1 => $item->{title},
 		line2 => $item->{artist}->{name},
 		type => 'playlist',
-		favorites_title => $item->{title} . ' - ' . $item->{artist}->{name},
+		favorites_title => $item->{title} . ' - ' . ($item->{artist}->{name} || $artist),
 		favorites_type => 'playlist',
 		favorites_url => 'deezer://album:' . $item->{id},
 		play => 'deezer://album:' . $item->{id},
@@ -836,7 +836,10 @@ sub _renderArtist {
 		name => cstring($client, 'ALBUMS'),
 		url => \&getArtistAlbums,
 		image => 'html/images/albums.png',
-		passthrough => [{ id => $item->{id} }],
+		passthrough => [ { 
+			id => $item->{id},
+			name => $item->{name},
+		} ],
 	}, {
 		name => cstring($client, 'RADIO'),
 		on_select => 'play',
@@ -892,7 +895,7 @@ sub _renderCompound {
 
 	push @$items, {
 		name => cstring($client, 'ALBUMS'),
-		items => _renderAlbums($item->{albums}),
+		items => _renderAlbums($item->{albums}, { addArtistToTitle => 1 }),
 		type  => 'outline',
 		image => 'html/images/albums.png',
 	} if $item->{albums};
