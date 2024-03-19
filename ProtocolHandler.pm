@@ -86,6 +86,19 @@ sub isRepeatingStream {
 	return _getRadio($url) || _getFlow($url);
 }
 
+sub trackGain {
+	my ($class, $client, $url) = @_;
+
+	return unless $client && blessed $client && $serverPrefs->client($client)->get('replayGainMode');
+
+	my $trackId = _getId($url);
+	my $meta = $cache->get( 'deezer_meta_' . ($trackId || '') );
+	return unless $meta;
+
+	main::INFOLOG && $log->is_info && $log->info("Replay gain: $meta->{replay_gain}");
+	return $meta->{replay_gain};
+}
+
 =comment
 # some streams are compressed in a way which causes stutter on ip3k based players
 sub forceTranscode {

@@ -329,6 +329,7 @@ sub _prepareTrack {
 		CONTENT_TYPE => $ct,
 		LOSSLESS     => $ct eq 'flc' ? 1 : 0,
 		RELEASETYPE  => $album->{type},
+		REPLAYGAIN_TRACK_GAIN => $track->{replay_gain},
 	};
 
 	my @trackArtists = map { $_->{name} } grep { $_->{name} ne $track->{artist}->{name} } @{ $album->{contributors} };

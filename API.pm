@@ -147,7 +147,6 @@ sub cacheTrackMetadata {
 	} @$tracks ];
 }
 
-
 sub cacheEpisodeMetadata {
 	my ($class, $episodes, $params) = @_;
 	
