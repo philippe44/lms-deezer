@@ -92,7 +92,7 @@ sub _getSection {
 				title => $entry->{title},
 				type => $entry->{type},
 			};
-			$item = Plugins::Deezer::Plugin::_renderItem($client, $item, { addArtistToTitle => 1 });
+			$item = Plugins::Deezer::Plugin::renderItem($client, $item, { addArtistToTitle => 1 });
 		}
 
 		push @$items, $item;

@@ -258,10 +258,10 @@ sub menuInfoWeb {
 			$method->( $api, $items, sub {
 				my ($icon, $entry) = @_;
 
-				# we need to add favorites for cliQuery to add them and I know I should not use _xxx function
+				# we need to add favorites for cliQuery to add them
 				$entry = Plugins::Deezer::Plugin::renderItem($client, $entry, { addArtistToTitle => 1 });
 				my $favorites = Slim::Control::XMLBrowser::_favoritesParams($entry) || {};
-				
+				$favorites->{favorites_icon} = $favorites->{icon} if $favorites;
 				$cb->( {
 					type  => 'opml',
 					%$favorites, 					
