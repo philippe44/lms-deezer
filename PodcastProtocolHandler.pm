@@ -181,5 +181,10 @@ sub _getId {
 	return $id;
 }
 
+sub getPlayingId {
+	my ($client, $url) = @_;
+	return _getId($url);
+}	
+
 
 1;

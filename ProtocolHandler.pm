@@ -583,4 +583,15 @@ sub _getFlow{
 	return $flow ? ($flow, $type) : ();
 }
 
+sub getPlayingId {
+	my ($client, $url) = @_;
+
+	if ( Plugins::Deezer::ProtocolHandler::_getFlow($url) ||
+		 Plugins::Deezer::ProtocolHandler::_getRadio($url) ) {
+		return $client->playingSong->pluginData('trackId');
+	}
+
+	return Plugins::Deezer::ProtocolHandler::_getId($url)
+}	
+
 1;

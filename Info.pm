@@ -86,11 +86,43 @@ sub trackInfoMenu {
 		} ],
 	} if $title;
 
-	return {
-		type => 'outlink',
+	my $feed = [ {
+		type => 'outline',
 		items => $items,
 		name => cstring($client, 'PLUGIN_DEEZER_ON_DEEZER'),
-	};
+	} ];
+
+	unshift @$feed, {
+		type => 'link',
+		name => cstring($client, 'PLUGIN_FAVORITES_SAVE') . ' (' . cstring($client, 'PLUGIN_DEEZER_ON_DEEZER') . ')',
+		url => \&addPlayingFavorites,
+		passthrough => [ { url => $url } ],
+	} if $url =~ m|deezer://|;
+
+	return $feed;
+}
+
+sub addPlayingFavorites {
+	my ($client, $cb, $args, $params) = @_;
+
+	my $id = Plugins::Deezer::ProtocolHandler::getPlayingId($client, $params->{url});
+	$id = Plugins::Deezer::PodcastProtocolHandler::getPlayingId($client, $params->{url}) unless $id;
+
+	return $cb->({
+		items => [{
+			type => 'text',
+			name => cstring($client, 'CONTROLPANEL_FAILED'),
+		}],
+	}) unless $id;
+
+	Plugins::Deezer::Plugin::getAPIHandler($client)->updateFavorite( sub {
+		$cb->({
+			items => [{
+				type => 'text',
+				name => cstring($client, 'COMPLETE'),
+			}],
+		});
+	}, 'add', 'tracks', $id );
 }
 
 sub albumInfoMenu {
@@ -183,6 +215,7 @@ sub menuInfoWeb {
 
 	$request->addParam('_index', 0);
 	$request->addParam('_quantity', 10);
+#$log->error("InfoWeb ", Data::Dump::dump($request));
 
 	# we can't get the response live, we must be called back by cliQuery to
 	# call it back ourselves
@@ -264,7 +297,7 @@ sub menuInfoWeb {
 				$favorites->{favorites_icon} = $favorites->{icon} if $favorites;
 				$cb->( {
 					type  => 'opml',
-					%$favorites, 					
+					%$favorites,
 					image => $icon,
 					items => $items,
 					# do we need this one?
@@ -354,7 +387,7 @@ sub menuBrowse {
 
 			# track must be in cache, no memorizing
 			my $cache = Slim::Utils::Cache->new;
-			my $track = Plugins::Deezer::Plugin::renderItem( $client, $cache->get('deezer_meta_' . $id), { addArtistToTitle => 1 } );	
+			my $track = Plugins::Deezer::Plugin::renderItem( $client, $cache->get('deezer_meta_' . $id), { addArtistToTitle => 1 } );
 			$cb->([$track]);
 
 		} elsif ( $type =~ /podcast/ ) {
