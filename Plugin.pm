@@ -530,9 +530,16 @@ sub getCompound {
 
 sub getPlaylist {
 	my ( $client, $cb, $args, $params ) = @_;
-
-	getAPIHandler($client)->playlistTracks(sub {
-		my $items = _renderTracks($_[0], 1);
+	
+	my $api = getAPIHandler($client);
+	
+	# we'll only set playlist id we own it so that we can remove track later
+	my $renderArgs = {
+		playlistId => $params->{id}
+	} if $api->userId eq $params->{creatorId};
+	
+	$api->playlistTracks(sub {
+		my $items = _renderTracks($_[0], $renderArgs);
 		$cb->( { items => $items } );
 	}, $params->{id} );
 }
@@ -587,7 +594,7 @@ sub renderItem {
 	$args ||= {};
 
 	if ($type eq 'track') {
-		return _renderTrack($item, $args->{addArtistToTitle});
+		return _renderTrack($item, $args->{addArtistToTitle}, $args->{playlistId});
 	}
 	elsif ($type eq 'album') {
 		return _renderAlbum($item, $args->{addArtistToTitle});
@@ -644,7 +651,7 @@ sub _renderPlaylist {
 		},
 		url => \&getPlaylist,
 		image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder'),
-		passthrough => [ { id => $item->{id} } ],
+		passthrough => [ { id => $item->{id}, creatorId => $item->{creator}->{id} } ],
 	};
 }
 
@@ -700,15 +707,15 @@ sub _renderRadio {
 }
 
 sub _renderTracks {
-	my ($tracks, $addArtistToTitle) = @_;
+	my ($tracks, $args) = @_;
 
 	return [ map {
-		_renderTrack($_, $addArtistToTitle);
+		_renderTrack($_, $args->{addArtistToTitle}, $args->{playlistId});
 	} @$tracks ];
 }
 
 sub _renderTrack {
-	my ($item, $addArtistToTitle) = @_;
+	my ($item, $addArtistToTitle, $playlistId) = @_;
 
 	my $title = $item->{title};
 	$title .= ' - ' . $item->{artist}->{name} if $addArtistToTitle;
@@ -731,6 +738,7 @@ sub _renderTrack {
 				fixedParams => {
 					type => 'tracks',
 					id => $item->{id},
+					playlistId => $playlistId,
 				},
 			},
 		},

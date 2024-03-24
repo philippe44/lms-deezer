@@ -18,7 +18,6 @@ PLUGIN_DEEZER_REGISTER
 	FR	par le plugin. Le jeton ARL est nécessaire. Utilisez Google, YouTube ou Reddit pour
 	FR	savoir comment l'obtenir. <br>SEULS LES COMPTES PREMIUM SONT UTILISABLES.
 
-
 PLUGIN_DEEZER_AUTH_FAILED
 	DE	Anmeldung fehlgeschlagen, oder kein Premium Konto.
 	EN	Authorization failed, or no Premium account.

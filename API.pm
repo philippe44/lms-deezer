@@ -52,6 +52,14 @@ sub getSomeUserId {
 	return $account;
 }
 
+sub getAccessToken {
+	my ($class, $userId) = @_;
+
+	my $accounts = $prefs->get('accounts') || {};
+	my $profile  = $accounts->{$userId};
+	return $profile->{token};
+}
+
 sub getCountryCode {
 	my ($class, $userId) = @_;
 	my $accounts = $prefs->get('accounts') || {};
