@@ -476,8 +476,7 @@ sub getCollectionFingerprint {
 sub updateFavorite {
 	my ($self, $cb, $action, $type, $id) = @_;
 
-	my $accounts = $prefs->get('accounts') || {};
-	my $profile  = $accounts->{$self->userId};
+	my $profile = Plugins::Deezer::API->getUserdata($self->userId);
 	my $access_token = $profile->{token} if $profile;
 
 	# well... we have a trailing 's' (I know this is hacky... and bad)
@@ -639,9 +638,8 @@ sub _getProviders {
 sub _getUserContext {
 	my ($self, $cb) = @_;
 
-	my $accounts = $prefs->get('accounts') || {};
-	my $profile  = $accounts->{$self->userId};
-	my $arl = $profile->{arl};
+	my $profile = Plugins::Deezer::API->getUserdata($self->userId);
+	my $arl = $profile->{arl} if $profile;
 
 	return $self->_getTokens( $cb, { arl => $arl } ) if $arl && $profile->{status} == 2;
 
@@ -747,8 +745,7 @@ sub _get {
 	my $ttl = delete $params->{_ttl} || DEFAULT_TTL;
 	my $noCache = delete $params->{_nocache};
 
-	my $accounts = $prefs->get('accounts') || {};
-	my $profile  = $accounts->{$self->userId};
+	my $profile  = Plugins::Deezer::API->getUserdata($self->userId);
 
 	$params->{access_token} = $profile->{token};
 	$params->{limit} ||= DEFAULT_LIMIT;
