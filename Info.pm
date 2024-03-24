@@ -99,12 +99,12 @@ sub trackInfoMenu {
 	if ( $url =~ m|deezer://| ) {
 		unshift @$feed, ( {
 			type => 'link',
-			name => cstring($client, 'PLUGIN_FAVORITES_SAVE') . ' (' . cstring($client, 'PLUGIN_DEEZER_ON_DEEZER') . ')',
+			name => cstring($client, 'PLUGIN_DEEZER_ADD_TO_FAVORITE'),
 			url => \&addPlayingToFavorites,
 			passthrough => [ { url => $url } ],
 		}, {
 			type => 'link',
-			name => cstring($client, 'ADD_THIS_SONG_TO_PLAYLIST') . ' (' . cstring($client, 'PLUGIN_DEEZER_ON_DEEZER') . ')',
+			name => cstring($client, 'PLUGIN_DEEZER_ADD_TO_PLAYLIST'),
 			url => \&addPlayingToPlaylist,
 			passthrough => [ { url => $url } ],
 		} );
@@ -238,8 +238,7 @@ sub menuInfoWeb {
 			my $favorites = shift;
 
 			my $action = (grep { $_->{id} == $id && ($type =~ /$_->{type}/ || !$_->{type}) } @$favorites) ? 'remove' : 'add';
-			my $title = $action eq 'remove' ? cstring($client, 'PLUGIN_FAVORITES_REMOVE') : cstring($client, 'PLUGIN_FAVORITES_SAVE');
-			$title .= ' (' . cstring($client, 'PLUGIN_DEEZER_ON_DEEZER') . ')';
+			my $title = $action eq 'remove' ? cstring($client, 'PLUGIN_DEEZER_REMOVE_FROM_FAVORITES') : cstring($client, 'PLUGIN_DEEZER_ADD_TO_FAVORITES');
 
 			my $items = [];
 
@@ -273,7 +272,7 @@ sub menuInfoWeb {
 					},
 				}, {
 					type => 'link',
-					name => cstring($client, 'ADD_THIS_SONG_TO_PLAYLIST') . ' (' . cstring($client, 'PLUGIN_DEEZER_ON_DEEZER') . ')',
+					name => cstring($client, 'PLUGIN_DEEZER_ADD_TO_PLAYLIST'),
 					url => \&addToPlaylist,
 					passthrough => [ { id => $id } ],
 				} );
@@ -573,7 +572,7 @@ sub _menuTrackInfo {
 	if ($params->{playlistId} ) {
 		my $item = {
 			type => 'link',
-			name => cstring($api->client, 'REMOVE_THIS_SONG_FROM_PLAYLIST') . ' (' . cstring($api->client, 'PLUGIN_DEEZER_ON_DEEZER') . ')',
+			name => cstring($api->client, 'PLUGIN_DEEZER_REMOVE_FROM_PLAYLIST'),
 		};
 
 		if ($params->{menu}) {
