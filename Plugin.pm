@@ -974,7 +974,7 @@ sub getAPIHandler {
 		$api = $client->pluginData('api');
 
 		if ( !$api ) {
-			my $userdata = Plugins::TIDAL::API->getUserdata($prefs->client($client)->get('userId'));
+			my $userdata = Plugins::Deezer::API->getUserdata($prefs->client($client)->get('userId'));
 
 			# if there's no account assigned to the player, just pick one
 			if ( !$userdata ) {
