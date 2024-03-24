@@ -99,7 +99,7 @@ sub trackInfoMenu {
 	if ( $url =~ m|deezer://| ) {
 		unshift @$feed, ( {
 			type => 'link',
-			name => cstring($client, 'PLUGIN_DEEZER_ADD_TO_FAVORITE'),
+			name => cstring($client, 'PLUGIN_DEEZER_ADD_TO_FAVORITES'),
 			url => \&addPlayingToFavorites,
 			passthrough => [ { url => $url } ],
 		}, {
