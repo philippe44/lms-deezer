@@ -1032,39 +1032,5 @@ sub dontStopTheMusic {
 	}
 }
 
-sub dontStopTheMusic {
-	my $client  = shift;
-	my $cb      = shift;
-	my $nextArtist = shift;
-	my @artists = @_;
-
-	if ($nextArtist) {
-		getAPIHandler($client)->search(sub {
-			my $artists = shift || [];
-
-			my ($track) = map {
-				"deezer://artist/$_->{id}/radio.dzr"
-			} grep {
-				$_->{radio}
-			} @$artists;
-
-			if ($track) {
-				$cb->($client, [$track]);
-			}
-			else {
-				dontStopTheMusic($client, $cb, @artists);
-			}
-		},{
-			search => $nextArtist,
-			type => 'artist',
-			# strict => 'off'
-		});
-	}
-	else {
-		main::INFOLOG && $log->is_info && $log->info("No matching Smart Radio found for current playlist!");
-		$cb->($client);
-	}
-}
-
 
 1;
