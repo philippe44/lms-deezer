@@ -844,7 +844,7 @@ sub _renderArtist {
 		name => cstring($client, 'ALBUMS'),
 		url => \&getArtistAlbums,
 		image => 'html/images/albums.png',
-		passthrough => [ { 
+		passthrough => [ {
 			id => $item->{id},
 			name => $item->{name},
 		} ],
@@ -974,8 +974,10 @@ sub getAPIHandler {
 		$api = $client->pluginData('api');
 
 		if ( !$api ) {
+			my $userdata = Plugins::TIDAL::API->getUserdata($prefs->client($client)->get('userId'));
+
 			# if there's no account assigned to the player, just pick one
-			if ( !$prefs->client($client)->get('userId') ) {
+			if ( !$userdata ) {
 				my $userId = Plugins::Deezer::API->getSomeUserId();
 				$prefs->client($client)->set('userId', $userId) if $userId;
 			}

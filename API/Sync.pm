@@ -36,7 +36,7 @@ sub getFavorites {
 
 		$item;
 	} @{$result->{data} || []} ] if $result;
-	
+
 	return $items;
 }
 
@@ -64,7 +64,7 @@ sub playlist {
 	my $tracks = Plugins::Deezer::API->cacheTrackMetadata( [ grep {
 			$_->{type} && $_->{type} eq 'track'
 	} @{$playlist->{data} || []} ]) if $playlist;
-	
+
 	return $tracks;
 }
 
@@ -80,13 +80,12 @@ sub _get {
 	my ( $class, $url, $userId, $params ) = @_;
 
 	$userId ||= Plugins::Deezer::API->getSomeUserId();
-	
+
 	$params ||= {};
 	$params->{limit} ||= DEFAULT_LIMIT;
-	
+
 	if ($userId) {
-		my $accounts = $prefs->get('accounts') || {};
-		my $profile  = $accounts->{$userId};
+		my $profile  = Plugins::Deezer::API->getUserdata($userId) || {};
 		$params->{access_token} = $profile->{token};
 	}
 
@@ -105,7 +104,7 @@ sub _get {
 
 		$@ && $log->error($@);
 		main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($result));
-		
+
 		# see note on the Async version
 
 		if (ref $result eq 'HASH' && $result->{data} && $result->{total}) {

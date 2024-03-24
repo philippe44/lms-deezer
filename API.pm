@@ -52,20 +52,19 @@ sub getSomeUserId {
 	return $account;
 }
 
-sub getAccessToken {
+sub getUserdata {
 	my ($class, $userId) = @_;
+	return unless $userId;
 
-	my $accounts = $prefs->get('accounts') || {};
-	my $profile  = $accounts->{$userId};
-	return $profile->{token};
+	my $accounts = $prefs->get('accounts') || return;
+	return $accounts->{$userId};
 }
 
+# TODO - remove, as unused?
 sub getCountryCode {
 	my ($class, $userId) = @_;
-	my $accounts = $prefs->get('accounts') || {};
-
-	return 'US' unless $accounts && $userId && $accounts->{$userId};
-	return $accounts->{$userId}->{countryCode} || 'US';
+	my $userdata = $class->getUserdata($userId) || {};
+	return $userdata->{country} || 'US';
 }
 
 sub getFormat {
@@ -120,9 +119,9 @@ sub typeOfItem {
 
 sub cacheTrackMetadata {
 	my ($class, $tracks, $params) = @_;
-	
+
 	return [] unless $tracks;
-	
+
 	return [ map {
 		my $entry = $_;
 		my $oldMeta = $cache->get( 'deezer_meta_' . $entry->{id}) || {};
@@ -144,7 +143,7 @@ sub cacheTrackMetadata {
 			tracknum => $entry->{track_position},
 			link => $entry->{link},
 		};
-		
+
 		# make sure we won't come back
 		$meta->{_complete} = 1 if $meta->{tracknum} || ($params && $params->{cache});
 
@@ -157,7 +156,7 @@ sub cacheTrackMetadata {
 
 sub cacheEpisodeMetadata {
 	my ($class, $episodes, $params) = @_;
-	
+
 	return [] unless $episodes;
 	$params ||= {};
 
@@ -179,7 +178,7 @@ sub cacheEpisodeMetadata {
 			comment => $entry->{description},
 			date => substr($entry->{release_date}, 0, 10),
 		};
-		
+
 		# make sure we won't come back
 		$meta->{_complete} = 1 if $meta->{album} || $params->{cache};
 

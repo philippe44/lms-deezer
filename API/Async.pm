@@ -476,8 +476,8 @@ sub getCollectionFingerprint {
 sub updateFavorite {
 	my ($self, $cb, $action, $type, $id) = @_;
 
-	# need everything to update the library
-	my $access_token = Plugins::Deezer::API->getAccessToken($self->userId);
+	my $profile = Plugins::Deezer::API->getUserdata($self->userId);
+	my $access_token = $profile->{token} if $profile;
 	return $cb() unless $action && $type && $id && $access_token;
 
 	# well... we have a trailing 's' (I know this is hacky... and bad)
@@ -669,9 +669,8 @@ sub _getProviders {
 sub _getUserContext {
 	my ($self, $cb) = @_;
 
-	my $accounts = $prefs->get('accounts') || {};
-	my $profile  = $accounts->{$self->userId};
-	my $arl = $profile->{arl};
+	my $profile = Plugins::Deezer::API->getUserdata($self->userId);
+	my $arl = $profile->{arl} if $profile;
 
 	return $self->_getTokens( $cb, { arl => $arl } ) if $arl && $profile->{status} == 2;
 
@@ -777,7 +776,8 @@ sub _get {
 	my $ttl = delete $params->{_ttl} || DEFAULT_TTL;
 	my $noCache = delete $params->{_nocache};
 
-	$params->{access_token} = Plugins::Deezer::API->getAccessToken($self->userId);
+	my $profile  = Plugins::Deezer::API->getUserdata($self->userId);
+	$params->{access_token} = $profile->{token};
 	$params->{limit} ||= DEFAULT_LIMIT;
 
 	my $cacheKey = "deezer_resp:$url:" . join(':', map {
