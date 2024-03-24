@@ -518,7 +518,8 @@ sub updatePlaylist {
 	# remove that playlist from cache
 	$cache->remove('deezer_playlist_' . $id);
 
-	my $access_token = 	Plugins::Deezer::API->getAccessToken($self->userId);
+	my $profile  = Plugins::Deezer::API->getUserdata($self->userId);
+	my $access_token = 	$profile->{token};
 	
 	my $query = complex_to_query( {
 		songs => $trackId,
