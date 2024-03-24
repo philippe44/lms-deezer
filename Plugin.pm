@@ -836,7 +836,7 @@ sub _renderArtist {
 		name => cstring($client, 'ALBUMS'),
 		url => \&getArtistAlbums,
 		image => 'html/images/albums.png',
-		passthrough => [ { 
+		passthrough => [ {
 			id => $item->{id},
 			name => $item->{name},
 		} ],
@@ -986,40 +986,6 @@ sub getAPIHandler {
 	logBacktrace("Failed to get a Deezer API instance: $client") unless $api;
 
 	return $api;
-}
-
-sub dontStopTheMusic {
-	my $client  = shift;
-	my $cb      = shift;
-	my $nextArtist = shift;
-	my @artists = @_;
-
-	if ($nextArtist) {
-		getAPIHandler($client)->search(sub {
-			my $artists = shift || [];
-
-			my ($track) = map {
-				"deezer://artist/$_->{id}/radio.dzr"
-			} grep {
-				$_->{radio}
-			} @$artists;
-
-			if ($track) {
-				$cb->($client, [$track]);
-			}
-			else {
-				dontStopTheMusic($client, $cb, @artists);
-			}
-		},{
-			search => $nextArtist,
-			type => 'artist',
-			# strict => 'off'
-		});
-	}
-	else {
-		main::INFOLOG && $log->is_info && $log->info("No matching Smart Radio found for current playlist!");
-		$cb->($client);
-	}
 }
 
 sub dontStopTheMusic {
