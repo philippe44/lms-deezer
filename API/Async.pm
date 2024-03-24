@@ -478,12 +478,10 @@ sub updateFavorite {
 
 	my $profile = Plugins::Deezer::API->getUserdata($self->userId);
 	my $access_token = $profile->{token} if $profile;
+	return $cb() unless $action && $type && $id && $access_token;
 
 	# well... we have a trailing 's' (I know this is hacky... and bad)
 	my $item = substr($type, 0, -1);
-
-	# need everything to update the library
-	return $cb() unless $action && $type && $id && $access_token;
 
 	# make sure we'll force an update check next time
 	my $updated = $self->updated;
@@ -501,6 +499,39 @@ sub updateFavorite {
 	# no DELETE method in SimpleAsync
 	my $http = Slim::Networking::Async::HTTP->new;
 	my $request = HTTP::Request->new( $method => BURL . "/user/me/$type?$query" );
+	$request->header( 'Content-Length' => 0);
+	$http->send_request( {
+		request => $request,
+		onBody  => $cb,
+		onError => sub {
+			my ($http, $error) = @_;
+			$log->warn("Error: $error");
+			main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($http));
+			$cb->();
+		}
+	} );
+}
+
+sub updatePlaylist {
+	my ($self, $cb, $action, $id, $trackId) = @_;
+
+	# remove that playlist from cache
+	$cache->remove('deezer_playlist_' . $id);
+
+	my $access_token = 	Plugins::Deezer::API->getAccessToken($self->userId);
+	
+	my $query = complex_to_query( {
+		songs => $trackId,
+		access_token => $access_token,
+	} );
+
+	my $method = ($action =~ /add/) ? 'POST' : 'DELETE';
+	my $trace = $query =~ s/(access_token=)\w+/${1}***/r;
+	main::INFOLOG && $log->is_info && $log->info(uc($method) . " /playlist/$id/tracks?$trace");
+
+	# no DELETE method in SimpleAsync
+	my $http = Slim::Networking::Async::HTTP->new;
+	my $request = HTTP::Request->new( $method => BURL . "/playlist/$id/tracks?$query" );
 	$request->header( 'Content-Length' => 0);
 	$http->send_request( {
 		request => $request,
@@ -746,7 +777,6 @@ sub _get {
 	my $noCache = delete $params->{_nocache};
 
 	my $profile  = Plugins::Deezer::API->getUserdata($self->userId);
-
 	$params->{access_token} = $profile->{token};
 	$params->{limit} ||= DEFAULT_LIMIT;
 

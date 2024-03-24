@@ -29,11 +29,14 @@ sub init {
 #  |  |  |has Tags
 #  |  |  |  |Function to call
 	Slim::Control::Request::addDispatch( [ 'deezer_info', 'items', '_index', '_quantity' ],	[ 1, 1, 1, \&menuInfoWeb ]	);
-	Slim::Control::Request::addDispatch( [ 'deezer_info', 'jive' ],	[ 1, 1, 1, \&menuInfoJive ]	);
+	Slim::Control::Request::addDispatch( [ 'deezer_info', 'jive', '_action' ],	[ 1, 1, 1, \&menuInfoJive ]	);
 	Slim::Control::Request::addDispatch( [ 'deezer_browse', 'items' ],	[ 1, 1, 1, \&menuBrowse ]	);
 	Slim::Control::Request::addDispatch( [ 'deezer_browse', 'playlist', '_method' ],	[ 1, 1, 1, \&menuBrowse ]	);
 }
 
+#
+# called when track is in current playlist
+#
 sub trackInfoMenu {
 	my ($client, $url, $track, $remoteMeta) = @_;
 
@@ -92,39 +95,37 @@ sub trackInfoMenu {
 		name => cstring($client, 'PLUGIN_DEEZER_ON_DEEZER'),
 	} ];
 
-	unshift @$feed, {
-		type => 'link',
-		name => cstring($client, 'PLUGIN_FAVORITES_SAVE') . ' (' . cstring($client, 'PLUGIN_DEEZER_ON_DEEZER') . ')',
-		url => \&addPlayingFavorites,
-		passthrough => [ { url => $url } ],
-	} if $url =~ m|deezer://|;
+	# if we are playing a deezer track, then we can add it to favorites or playlists
+	if ( $url =~ m|deezer://| ) {
+		unshift @$feed, ( {
+			type => 'link',
+			name => cstring($client, 'PLUGIN_FAVORITES_SAVE') . ' (' . cstring($client, 'PLUGIN_DEEZER_ON_DEEZER') . ')',
+			url => \&addPlayingToFavorites,
+			passthrough => [ { url => $url } ],
+		}, {
+			type => 'link',
+			name => cstring($client, 'ADD_THIS_SONG_TO_PLAYLIST') . ' (' . cstring($client, 'PLUGIN_DEEZER_ON_DEEZER') . ')',
+			url => \&addPlayingToPlaylist,
+			passthrough => [ { url => $url } ],
+		} );
+	}
 
 	return $feed;
 }
 
-sub addPlayingFavorites {
-	my ($client, $cb, $args, $params) = @_;
-
-	my $id = Plugins::Deezer::ProtocolHandler::getPlayingId($client, $params->{url});
-	$id = Plugins::Deezer::PodcastProtocolHandler::getPlayingId($client, $params->{url}) unless $id;
-
-	return $cb->({
+sub _completed {
+	my ($client, $cb) = @_;
+	$cb->({
 		items => [{
 			type => 'text',
-			name => cstring($client, 'CONTROLPANEL_FAILED'),
+			name => cstring($client, 'COMPLETE'),
 		}],
-	}) unless $id;
-
-	Plugins::Deezer::Plugin::getAPIHandler($client)->updateFavorite( sub {
-		$cb->({
-			items => [{
-				type => 'text',
-				name => cstring($client, 'COMPLETE'),
-			}],
-		});
-	}, 'add', 'tracks', $id );
+	});
 }
 
+#
+# not sure
+#
 sub albumInfoMenu {
 	my ($client, $url, $album, $remoteMeta) = @_;
 
@@ -143,12 +144,15 @@ sub albumInfoMenu {
 		url       => \&Plugins::Deezer::Plugin::search,
 		# image 	  => __PACKAGE__->_pluginDataFor('icon'),
 		passthrough => [ {
-			query => $query,
+		query => $query,
 			strict => 'on',
 		} ],
 	};
 }
 
+#
+# not sure
+#
 sub artistInfoMenu {
 	my ($client, $url, $artist, $remoteMeta) = @_;
 
@@ -168,6 +172,9 @@ sub artistInfoMenu {
 	};
 }
 
+#
+# not sure
+#
 sub browseArtistMenu {
 	my ($client, $cb, $args, $params) = @_;
 
@@ -206,6 +213,9 @@ sub browseArtistMenu {
 	}
 }
 
+#
+# called when clicking 'M' icon on artist/album/tracl/podcast/episode list of items in a feed
+#
 sub menuInfoWeb {
 	my $request = shift;
 
@@ -233,43 +243,40 @@ sub menuInfoWeb {
 
 			my $items = [];
 
+			my $item = {
+				type => 'link',
+				name => $title,
+			};
+
 			if ($request->getParam('menu')) {
-				push @$items, {
-					type => 'link',
-					name => $title,
+				push @$items, { %$item,
 					isContextMenu => 1,
 					refresh => 1,
 					jive => {
+						nextWindow => 'parent',
 						actions => {
 							go => {
 								player => 0,
-								cmd    => [ 'deezer_info', 'jive' ],
-									params => {
-									type => $type,
-									id => $id,
-									action => $action,
-								},
+								cmd    => [ 'deezer_info', 'jive', $action ],
+								params => {	type => $type, id => $id },
 							}
 						},
-						nextWindow => 'parent'
 					},
 				};
 			} else {
-				push @$items, {
-					type => 'link',
-					name => $title,
+				push @$items, ( { %$item,
 					url => sub {
 						my ($client, $ucb) = @_;
 						$api->updateFavorite( sub {
-							$ucb->({
-								items => [{
-									type => 'text',
-									name => cstring($client, 'COMPLETE'),
-								}],
-							});
+							_completed($client, $ucb);
 						}, $action, $type, $id );
 					},
-				};
+				}, {
+					type => 'link',
+					name => cstring($client, 'ADD_THIS_SONG_TO_PLAYLIST') . ' (' . cstring($client, 'PLUGIN_DEEZER_ON_DEEZER') . ')',
+					url => \&addToPlaylist,
+					passthrough => [ { id => $id } ],
+				} );
 			}
 
 			my $method;
@@ -310,22 +317,98 @@ sub menuInfoWeb {
 	}, $request );
 }
 
+#
+# build a list of modifiable playlists and return a feed that can be used to select
+# one playlist and add track whose id is provided to it
+#
+sub addToPlaylist {
+	my ($client, $cb, $args, $params) = @_;
+
+	my $api = Plugins::Deezer::Plugin::getAPIHandler($client);
+
+	$api->getFavorites(sub {
+		my $items = [];
+
+		# only present playlist that we have the right to modify
+		foreach my $item ( @{$_[0] || {}} ) {
+			next if $item->{creator}->{id} ne $api->userId;
+
+			push @$items, {
+				name => $item->{title},
+				url => sub {
+					my ($client, $cb, $args, $params) = @_;
+					$api->updatePlaylist( sub {
+						_completed($client, $cb);
+					}, 'add', $params->{id}, $params->{trackId} );
+				},
+				image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder'),
+				passthrough => [ { trackId => $params->{id}, id => $item->{id} } ],
+			};
+		}
+
+		$cb->( { items => $items } );
+	}, 'playlists' );
+}
+
+#
+# add currently playing track to favorites
+#
+sub addPlayingToFavorites {
+	my ($client, $cb, $args, $params) = @_;
+
+	my $id = Plugins::Deezer::ProtocolHandler::getPlayingId($client, $params->{url});
+	$id = Plugins::Deezer::PodcastProtocolHandler::getPlayingId($client, $params->{url}) unless $id;
+	return _completed($client, $cb) unless $id;
+
+	Plugins::Deezer::Plugin::getAPIHandler($client)->updateFavorite( sub {
+		_completed($client, $cb);
+	}, 'add', 'tracks', $id );
+}
+
+#
+# as addToPlaylist but use currently playing track
+#
+sub addPlayingToPlaylist {
+	my ($client, $cb, $args, $params) = @_;
+
+	my $id = Plugins::Deezer::ProtocolHandler::getPlayingId($client, $params->{url});
+	$id = Plugins::Deezer::PodcastProtocolHandler::getPlayingId($client, $params->{url}) unless $id;
+	return _completed($client, $cb) unless $id;
+
+	addToPlaylist($client, $cb, { }, { id => $id }),
+}
+
+#
+# a query that can, for JSON/Jive controllers, execute various requests like add/del a
+# track/playlist/album/artist from favorites or remove a track from a given playlist. Note
+# that the target playlist must be selected in an other menu, this is just performing the
+# action in a way that is compatible with JSON/Jive
+#
 sub menuInfoJive {
 	my $request = shift;
 
-	my $type = $request->getParam('type');
 	my $id = $request->getParam('id');
 	my $api = Plugins::Deezer::Plugin::getAPIHandler($request->client);
-	my $action = $request->getParam('action');
+	my $action = $request->getParam('_action');
 
-	$api->updateFavorite( sub { }, $action, $type, $id );
+	if ($action =~ /removeTrack/ ) {
+		my $playlistId = $request->getParam('playlistId');
+		$api->updatePlaylist( sub { }, 'del', $playlistId, $id );
+	} else {
+		my $type = $request->getParam('type');
+		$api->updateFavorite( sub { }, $action, $type, $id );
+	}
 }
 
+#
+# browse capabilities when starting from the 'M' menu as we have lost context when
+# drilling from there. It cache feeds and allows re-drilling from the 'M' menu to then
+# go anywhere (in other words, provides an anchor)
+#
 sub menuBrowse {
 	my $request = shift;
 
 	my $client = $request->client;
-#$log->error(Data::Dump::dump($request));
 	my $itemId = $request->getParam('item_id');
 	my $type = $request->getParam('type');
 	my $id = $request->getParam('id');
@@ -336,7 +419,7 @@ sub menuBrowse {
 
 	main::INFOLOG && $log->is_info && $log->info("Browsing for item_id:$itemId or type:$type:$id");
 
-	# if we are descending, no need to search, just get our root
+	# if we are re-drilling, no need to search, just get our anchor/root
 	if ( defined $itemId ) {
 		my ($key) = $itemId =~ /([^\.]+)/;
 		my $cached = ${$rootFeeds{$key}};
@@ -469,6 +552,9 @@ sub _menuPlay {
 	};
 }
 
+#
+# build info and menus for when pressing 'M' on a track
+#
 sub _menuTrackInfo {
 	my ($api, $items, $cb, $params) = @_;
 
@@ -482,6 +568,41 @@ sub _menuTrackInfo {
 	# play/add/add_next options except for skins that don't want it
 	my $base = _menuBase($api->client, 'track', $id, $params);
 	push @$items, @$base if @$base;
+
+	# if we have a playlist id, then we might remove that track from playlist
+	if ($params->{playlistId} ) {
+		my $item = {
+			type => 'link',
+			name => cstring($api->client, 'REMOVE_THIS_SONG_FROM_PLAYLIST') . ' (' . cstring($api->client, 'PLUGIN_DEEZER_ON_DEEZER') . ')',
+		};
+
+		if ($params->{menu}) {
+			push @$items, { %$item,
+				isContextMenu => 1,
+				refresh => 1,
+				jive => {
+					nextWindow => 'parent',
+					actions => {
+						go => {
+							player => 0,
+							cmd    => [ 'deezer_info', 'jive', 'removeTrack' ],
+							params => { id => $params->{id}, playlistId => $params->{playlistId} },
+						}
+					},
+				},
+			}
+		} else {
+			push @$items, { %$item,
+				url => sub {
+					my ($client, $cb, $args, $params) = @_;
+					$api->updatePlaylist( sub {
+						_completed($api->client, $cb);
+					}, 'del', $params->{playlistId}, $params->{id} );
+				},
+				passthrough => [ $params ],
+			}
+		}
+	}
 
 	push @$items, ( {
 		type => 'link',
@@ -517,6 +638,9 @@ sub _menuTrackInfo {
 	$cb->($track->{cover}, $track);
 }
 
+#
+# build info and menus for when pressing 'M' on an album
+#
 sub _menuAlbumInfo {
 	my ($api, $items, $cb, $params) = @_;
 
@@ -568,6 +692,9 @@ sub _menuAlbumInfo {
 	}, $id );
 }
 
+#
+# build info and menus for when pressing 'M' on a artist
+#
 sub _menuArtistInfo {
 	my ($api, $items, $cb, $params) = @_;
 
@@ -604,6 +731,9 @@ sub _menuArtistInfo {
 	}, $id );
 }
 
+#
+# build info and menus for when pressing 'M' on a playlist
+#
 sub _menuPlaylistInfo {
 	my ($api, $items, $cb, $params) = @_;
 
@@ -649,6 +779,9 @@ sub _menuPlaylistInfo {
 	}, $id );
 }
 
+#
+# build info and menus for when pressing 'M' on a podcast
+#
 sub _menuPodcastInfo {
 	my ($api, $items, $cb, $params) = @_;
 
@@ -684,6 +817,9 @@ sub _menuPodcastInfo {
 	}, $id );
 }
 
+#
+# build info and menus for when pressing 'M' on an episode
+#
 sub _menuEpisodeInfo {
 	my ($api, $items, $cb, $params) = @_;
 

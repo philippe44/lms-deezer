@@ -54,11 +54,9 @@ sub getSomeUserId {
 
 sub getUserdata {
 	my ($class, $userId) = @_;
-
 	return unless $userId;
 
 	my $accounts = $prefs->get('accounts') || return;
-
 	return $accounts->{$userId};
 }
 
