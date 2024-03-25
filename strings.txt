@@ -306,19 +306,23 @@ PLUGIN_DEEZER_DSTM_SMART_RADIO
 
 PLUGIN_DEEZER_DSTM_FLOW
 	EN	Deezer Flow
-	
+
 PLUGIN_DEEZER_ADD_TO_FAVORITES
+	DE	Zu Deezer Favoriten hinzufügen
 	EN	Add to Deezer favorites
 	FR	Ajouter aux favoris Deezer
 
 PLUGIN_DEEZER_REMOVE_FROM_FAVORITES
+	DE	Aus Deezer Favoriten entfernen
 	EN	Remove from Deezer favorites
 	FR	Supprimer des favoris Deezer
 
 PLUGIN_DEEZER_ADD_TO_PLAYLIST
+	DE	Zu Deezer Wiedergabeliste hinzufügen
 	EN	Add to a Deezer playlist
 	FR	Ajouter à une liste de lecture Deezer
 
 PLUGIN_DEEZER_REMOVE_FROM_PLAYLIST
+	DE	Aus Deezer Wiedergabeliste entfernen
 	EN	Remove from Deezer playlist
 	FR	Supprimer de la liste de lecture Deezer
