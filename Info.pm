@@ -248,7 +248,8 @@ sub menuInfoWeb {
 			};
 
 			if ($request->getParam('menu')) {
-				push @$items, { %$item,
+				push @$items, { 
+					%$item,
 					isContextMenu => 1,
 					refresh => 1,
 					jive => {
@@ -262,20 +263,42 @@ sub menuInfoWeb {
 						},
 					},
 				};
+				
+=comment		
+				TODO: for Jive as well
+				push @$items, { 
+					isContextMenu => 1,
+					refresh => 1,
+					jive => {
+						nextWindow => 'parent',
+						actions => {
+							go => {
+								player => 0,
+								cmd    => [ 'deezer_info', 'jive', $action ],
+								params => {	type => $type, id => $id },
+							}
+						},
+					},
+				};
+=cut				
 			} else {
-				push @$items, ( { %$item,
+				push @$items, { 
+					%$item,
 					url => sub {
 						my ($client, $ucb) = @_;
 						$api->updateFavorite( sub {
 							_completed($client, $ucb);
 						}, $action, $type, $id );
 					},
-				}, {
+				};
+				
+				# only tracks can be added to playlist
+				push @$items, {
 					type => 'link',
 					name => cstring($client, 'PLUGIN_DEEZER_ADD_TO_PLAYLIST'),
 					url => \&addToPlaylist,
 					passthrough => [ { id => $id } ],
-				} );
+				} if $type =~ /track/;
 			}
 
 			my $method;

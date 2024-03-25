@@ -320,5 +320,5 @@ PLUGIN_DEEZER_ADD_TO_PLAYLIST
 	FR	Ajouter à une liste de lecture Deezer
 
 PLUGIN_DEEZER_REMOVE_FROM_PLAYLIST
-	EN	Remove from Deezer playlist
-	FR	Supprimer de la liste de lecture Deezer
+	EN	Remove from this playlist
+	FR	Supprimer de cette liste de lecture
