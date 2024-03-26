@@ -366,7 +366,7 @@ sub handleFeed {
 			# image => 'html/images/playall.png',
 			passthrough => [{ type => 'track' }],
 		},{
-			name => cstring($client, 'RADIO'),
+			name => cstring($client, 'PLUGIN_DEEZER_SMART_RADIO'),
 			type  => 'search',
 			url   => \&search,
 			# image => 'plugins/Deezer/html/smart_radio.png',
@@ -536,14 +536,14 @@ sub getCompound {
 
 sub getPlaylist {
 	my ( $client, $cb, $args, $params ) = @_;
-	
+
 	my $api = getAPIHandler($client);
-	
+
 	# we'll only set playlist id we own it so that we can remove track later
 	my $renderArgs = {
 		playlistId => $params->{id}
 	} if $api->userId eq $params->{creatorId};
-	
+
 	$api->playlistTracks(sub {
 		my $items = _renderTracks($_[0], $renderArgs);
 		$cb->( { items => $items } );
@@ -855,9 +855,9 @@ sub _renderArtist {
 			name => $item->{name},
 		} ],
 	}, {
-		name => cstring($client, 'RADIO'),
+		name => cstring($client, 'PLUGIN_DEEZER_SMART_RADIO'),
 		on_select => 'play',
-		favorites_title => "$item->{name} - " . cstring($client, 'RADIO'),
+		favorites_title => "$item->{name} - " . cstring($client, 'PLUGIN_DEEZER_SMART_RADIO'),
 		favorites_icon => $image,
 		type => 'audio',
 		play => "deezer://artist/$item->{id}/radio.dzr",
@@ -941,7 +941,7 @@ sub _renderGenreMusic {
 		image => 'html/images/artists.png',
 		passthrough => [ { id => $item->{id}, type => 'artists' } ],
 	}, {
-		name => cstring($client, 'RADIO'),
+		name => cstring($client, 'PLUGIN_DEEZER_SMART_RADIO'),
 		type  => 'link',
 		url   => \&getGenreItems,
 		image => 'plugins/Deezer/html/smart_radio.png',

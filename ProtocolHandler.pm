@@ -524,10 +524,10 @@ sub getMetadataFor {
 	}
 
 	# if metadata is in cache and is full
-	if ( $meta && ($meta->{_complete} || ($song && $song->track->url ne $url)) ) {
+	if ($meta) {
 		$meta->{artist} = $meta->{artist}->{name} if ref $meta->{artist};
 		$meta->{album} = $meta->{album}->{title} if ref $meta->{album};
-		return $meta;
+		return $meta if $meta->{_complete} || ($song && $song->track->url ne $url);
 	}
 
 	my $now = time();
