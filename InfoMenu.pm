@@ -1,4 +1,4 @@
-package Plugins::Deezer::Info;
+package Plugins::Deezer::InfoMenu;
 
 use strict;
 use Tie::Cache::LRU;
@@ -29,7 +29,8 @@ sub init {
 #  |  |  |has Tags
 #  |  |  |  |Function to call
 	Slim::Control::Request::addDispatch( [ 'deezer_info', 'items', '_index', '_quantity' ],	[ 1, 1, 1, \&menuInfoWeb ]	);
-	Slim::Control::Request::addDispatch( [ 'deezer_info', 'jive', '_action' ],	[ 1, 1, 1, \&menuInfoJive ]	);
+	Slim::Control::Request::addDispatch( [ 'deezer_action', 'items', '_index', '_quantity' ],	[ 1, 1, 1, \&menuAction ]	);
+	Slim::Control::Request::addDispatch( [ 'deezer_action', '_action' ],	[ 1, 1, 1, \&menuAction ]	);
 	Slim::Control::Request::addDispatch( [ 'deezer_browse', 'items' ],	[ 1, 1, 1, \&menuBrowse ]	);
 	Slim::Control::Request::addDispatch( [ 'deezer_browse', 'playlist', '_method' ],	[ 1, 1, 1, \&menuBrowse ]	);
 }
@@ -239,17 +240,12 @@ sub menuInfoWeb {
 
 			my $action = (grep { $_->{id} == $id && ($type =~ /$_->{type}/ || !$_->{type}) } @$favorites) ? 'remove' : 'add';
 			my $title = $action eq 'remove' ? cstring($client, 'PLUGIN_DEEZER_REMOVE_FROM_FAVORITES') : cstring($client, 'PLUGIN_DEEZER_ADD_TO_FAVORITES');
-
 			my $items = [];
-
-			my $item = {
-				type => 'link',
-				name => $title,
-			};
 
 			if ($request->getParam('menu')) {
 				push @$items, { 
-					%$item,
+					type => 'link',
+					name => $title,
 					isContextMenu => 1,
 					refresh => 1,
 					jive => {
@@ -257,33 +253,29 @@ sub menuInfoWeb {
 						actions => {
 							go => {
 								player => 0,
-								cmd    => [ 'deezer_info', 'jive', $action ],
+								cmd    => [ 'deezer_action', $action ],
 								params => {	type => $type, id => $id },
 							}
 						},
 					},
 				};
 				
-=comment		
-				TODO: for Jive as well
+				# only tracks can be added to playlist
 				push @$items, { 
-					isContextMenu => 1,
-					refresh => 1,
-					jive => {
-						nextWindow => 'parent',
-						actions => {
-							go => {
-								player => 0,
-								cmd    => [ 'deezer_info', 'jive', $action ],
-								params => {	type => $type, id => $id },
-							}
+					type => 'link',
+					name => cstring($client, 'PLUGIN_DEEZER_ADD_TO_PLAYLIST'),
+					itemActions => {
+						items => {
+							command     => ['deezer_action', 'items' ],
+							fixedParams => { action => 'add_to_playlist', id => $id },
 						},
 					},
-				};
-=cut				
+				} if $type =~ /track/;
+
 			} else {
 				push @$items, { 
-					%$item,
+					type => 'link',
+					name => $title,
 					url => sub {
 						my ($client, $ucb) = @_;
 						$api->updateFavorite( sub {
@@ -344,7 +336,7 @@ sub menuInfoWeb {
 # one playlist and add track whose id is provided to it
 #
 sub addToPlaylist {
-	my ($client, $cb, $args, $params) = @_;
+	my ($client, $cb, undef, $params) = @_;
 
 	my $api = Plugins::Deezer::Plugin::getAPIHandler($client);
 
@@ -355,17 +347,41 @@ sub addToPlaylist {
 		foreach my $item ( @{$_[0] || {}} ) {
 			next if $item->{creator}->{id} ne $api->userId;
 
-			push @$items, {
-				name => $item->{title},
-				url => sub {
-					my ($client, $cb, $args, $params) = @_;
-					$api->updatePlaylist( sub {
-						_completed($client, $cb);
-					}, 'add', $params->{id}, $params->{trackId} );
-				},
-				image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder'),
-				passthrough => [ { trackId => $params->{id}, id => $item->{id} } ],
-			};
+			# we don't have to create a special RPC menu/action, we could simply let the 
+			# XML menu play, but the exit of the action is less user friendly as we land 
+			# on "complete" page like for Web::XMLBrowser
+			
+			if ($params->{menu}) {
+				push @$items, { 
+					type => 'link',
+					name => $item->{title},
+					isContextMenu => 1,
+					refresh => 1,
+					image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder'),
+					jive => {
+						nextWindow => 'grandparent',
+						actions => {
+							go => {
+								player => 0,
+								cmd    => [ 'deezer_action', 'add_track' ],
+								params => { id => $params->{id}, playlistId => $item->{id} },
+							}
+						},
+					},
+				};
+			} else {
+				push @$items, {
+					name => $item->{title},
+					url => sub {
+						my ($client, $cb, $args, $params) = @_;
+						$api->updatePlaylist( sub {
+							_completed($client, $cb);
+						}, 'add', $params->{id}, $params->{trackId} );
+					},
+					image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder'),
+					passthrough => [ { trackId => $params->{id}, id => $item->{id} } ],
+				};
+			}
 		}
 
 		$cb->( { items => $items } );
@@ -397,7 +413,7 @@ sub addPlayingToPlaylist {
 	$id = Plugins::Deezer::PodcastProtocolHandler::getPlayingId($client, $params->{url}) unless $id;
 	return _completed($client, $cb) unless $id;
 
-	addToPlaylist($client, $cb, { }, { id => $id }),
+	addToPlaylist($client, $cb, undef, { id => $id }),
 }
 
 #
@@ -406,19 +422,60 @@ sub addPlayingToPlaylist {
 # that the target playlist must be selected in an other menu, this is just performing the
 # action in a way that is compatible with JSON/Jive
 #
-sub menuInfoJive {
+sub menuAction {
 	my $request = shift;
 
-	my $id = $request->getParam('id');
-	my $api = Plugins::Deezer::Plugin::getAPIHandler($request->client);
-	my $action = $request->getParam('_action');
+	my $itemId = $request->getParam('item_id');
+	
+	# if we are re-drilling, no need to search, just get our anchor/root
+	if ( defined $itemId ) {
+		my ($key) = $itemId =~ /([^\.]+)/;
+		my $cached = ${$rootFeeds{$key}};
+		Slim::Control::XMLBrowser::cliQuery('deezer_action', $cached, $request);
+		return;
+	}
 
-	if ($action =~ /removeTrack/ ) {
-		my $playlistId = $request->getParam('playlistId');
-		$api->updatePlaylist( sub { }, 'del', $playlistId, $id );
+	my $entity  = $request->getRequest(1);			
+	my $id = $request->getParam('id');
+
+	# can be an action through a sub-feed (items) that needs to be displayed first, 
+	# so we to be ready to re-drill, or can be a direct action
+	if ($entity eq 'items') {
+		my $action = $request->getParam('action');
+		main::INFOLOG && $log->is_info && $log->info("JSON RPC query items with action $action");
+		
+		# we assume that only one controller wants to use a client at the same time
+		my $key = $request->client->id =~ s/://gr;
+		$request->addParam('item_id', $key);
+		
+		# only items 'action' for now is to add to playlist
+		if ($action =~ /add_to_playlist/ ) {
+			Slim::Control::XMLBrowser::cliQuery( 'deezer_action', sub {
+				my ($client, $cb, $args) = @_;
+			
+				addToPlaylist($client, sub {
+					my $feed = $_[0];
+					$rootFeeds{$key} = \$feed;
+					$cb->($feed); 
+				}, undef, { menu => $request->getParam('menu'), id => $id } );
+			}, $request );
+		}
 	} else {
-		my $type = $request->getParam('type');
-		$api->updateFavorite( sub { }, $action, $type, $id );
+		my $api = Plugins::Deezer::Plugin::getAPIHandler($request->client);
+		my $action = $request->getParam('_action');
+		main::INFOLOG && $log->is_info && $log->info("JSON RPC action $action for $id");
+		
+		if ($action =~ /remove_track/ ) {
+			my $playlistId = $request->getParam('playlistId');
+			$api->updatePlaylist( sub { }, 'del', $playlistId, $id );
+		} elsif ($action =~ /add_track/ ) {
+			# this is only used if we have a direct RPC menu set in addToPlaylist
+			my $playlistId = $request->getParam('playlistId');
+			$api->updatePlaylist( sub { }, 'add', $playlistId, $id );
+		} else {
+			my $type = $request->getParam('type');
+			$api->updateFavorite( sub { }, $action, $type, $id );
+		}
 	}
 }
 
@@ -444,9 +501,10 @@ sub menuBrowse {
 	# if we are re-drilling, no need to search, just get our anchor/root
 	if ( defined $itemId ) {
 		my ($key) = $itemId =~ /([^\.]+)/;
+
 		my $cached = ${$rootFeeds{$key}};
-#$log->error("usin cached feed ==========================", Data::Dump::dump($cached));
 		Slim::Control::XMLBrowser::cliQuery('deezer_browse', $cached, $request);
+		
 		return;
 	}
 
@@ -457,7 +515,8 @@ sub menuBrowse {
 	# breadcrums *before* we arrive here, in the _renderXXX familiy but I don't
 	# know how so we have to build our own "fake" dispatch just for that
 	# we only need to do that when we have to redescend further that hierarchy,
-	# not when it's one shot
+	# not when it's one shot and we assume that only one controller wants to use 
+	# a client at the same time
 	my $key = $client->id =~ s/://gr;
 	$request->addParam('item_id', $key);
 
@@ -593,13 +652,10 @@ sub _menuTrackInfo {
 
 	# if we have a playlist id, then we might remove that track from playlist
 	if ($params->{playlistId} ) {
-		my $item = {
-			type => 'link',
-			name => cstring($api->client, 'PLUGIN_DEEZER_REMOVE_FROM_PLAYLIST'),
-		};
-
 		if ($params->{menu}) {
-			push @$items, { %$item,
+			push @$items, { 
+				type => 'link',
+				name => cstring($api->client, 'PLUGIN_DEEZER_REMOVE_FROM_PLAYLIST'),
 				isContextMenu => 1,
 				refresh => 1,
 				jive => {
@@ -607,14 +663,16 @@ sub _menuTrackInfo {
 					actions => {
 						go => {
 							player => 0,
-							cmd    => [ 'deezer_info', 'jive', 'removeTrack' ],
+							cmd    => [ 'deezer_action', 'remove_track' ],
 							params => { id => $params->{id}, playlistId => $params->{playlistId} },
 						}
 					},
 				},
 			}
 		} else {
-			push @$items, { %$item,
+			push @$items, {
+				type => 'link',
+				name => cstring($api->client, 'PLUGIN_DEEZER_REMOVE_FROM_PLAYLIST'),
 				url => sub {
 					my ($client, $cb, $args, $params) = @_;
 					$api->updatePlaylist( sub {

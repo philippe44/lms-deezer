@@ -502,13 +502,8 @@ sub updateFavorite {
 	$request->header( 'Content-Length' => 0);
 	$http->send_request( {
 		request => $request,
-		onBody  => $cb,
-		onError => sub {
-			my ($http, $error) = @_;
-			$log->warn("Error: $error");
-			main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($http));
-			$cb->();
-		}
+		onBody  => sub { $cb->(); },
+		onError => sub { $cb->($_[1]); },
 	} );
 }
 
@@ -536,13 +531,8 @@ sub updatePlaylist {
 	$request->header( 'Content-Length' => 0);
 	$http->send_request( {
 		request => $request,
-		onBody  => $cb,
-		onError => sub {
-			my ($http, $error) = @_;
-			$log->warn("Error: $error");
-			main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($http));
-			$cb->();
-		}
+		onBody  => sub { $cb->(); },
+		onError => sub { $cb->($_[1]); },
 	} );
 }
 

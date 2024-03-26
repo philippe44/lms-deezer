@@ -14,7 +14,7 @@ use Plugins::Deezer::API::Async;
 use Plugins::Deezer::ProtocolHandler;
 use Plugins::Deezer::PodcastProtocolHandler;
 use Plugins::Deezer::Custom;
-use Plugins::Deezer::Info;
+use Plugins::Deezer::InfoMenu;
 
 my $log = Slim::Utils::Log->addLogCategory({
 	'category'    => 'plugin.deezer',
@@ -73,7 +73,7 @@ sub initPlugin {
 	Plugins::Deezer::API::Auth->init();
 	Plugins::Deezer::ProtocolHandler->init();
 	Plugins::Deezer::API::Async->init();
-	Plugins::Deezer::Info->init();
+	Plugins::Deezer::InfoMenu->init();
 
 	if (main::WEBUI) {
 		require Plugins::Deezer::Settings;
@@ -93,17 +93,17 @@ sub initPlugin {
 
 	Slim::Menu::TrackInfo->registerInfoProvider( deezer => (
 		after => 'bottom',
-		func  => \&Plugins::Deezer::Info::trackInfoMenu,
+		func  => \&Plugins::Deezer::InfoMenu::trackInfoMenu,
 	) );
 
 	Slim::Menu::ArtistInfo->registerInfoProvider( deezer => (
 		after => 'bottom',
-		func  => \&Plugins::Deezer::Info::artistInfoMenu,
+		func  => \&Plugins::Deezer::InfoMenu::artistInfoMenu,
 	) );
 
 	Slim::Menu::AlbumInfo->registerInfoProvider( deezer => (
 		after => 'bottom',
-		func  => \&Plugins::Deezer::Info::albumInfoMenu,
+		func  => \&Plugins::Deezer::InfoMenu::albumInfoMenu,
 	) );
 
 =comment
@@ -173,7 +173,7 @@ sub postinitPlugin {
 				name => cstring($client, 'BROWSE_ON_SERVICE', 'Deezer'),
 				type => 'link',
 				icon => $class->_pluginDataFor('icon'),
-				url  => \&Plugins::Deezer::Info::browseArtistMenu,
+				url  => \&Plugins::Deezer::InfoMenu::browseArtistMenu,
 			};
 		} );
 	}
