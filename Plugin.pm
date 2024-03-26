@@ -366,6 +366,12 @@ sub handleFeed {
 			# image => 'html/images/playall.png',
 			passthrough => [{ type => 'track' }],
 		},{
+			name => cstring($client, 'RADIO'),
+			type  => 'search',
+			url   => \&search,
+			# image => 'plugins/Deezer/html/smart_radio.png',
+			passthrough => [{ type => 'radio' }],
+		},{
 			name => cstring($client, 'PLUGIN_PODCAST'),
 			type  => 'search',
 			url   => \&search,
