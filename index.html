@@ -4,24 +4,50 @@
     <title>OAuth redirection</title>
     <script>
         function getLink() {
-            // Get the parameters from the URL
-            const urlParams = new URLSearchParams(window.location.search);
-            const code = urlParams.get('code');
-            var args = urlParams.get('args');
-            const seed = urlParams.get('seed');
-            
-            // Construct the new URL with the code parameter
-            const newUrl = `http://${args}/plugins/deezer/auth?seed=${seed}&code=${code}`;
+            const referrer = new URL(document.referrer);
+
+            let newUrl = 'https://www.deezer.com';
+
+            // only redirect when coming from deezer.com
+            if (referrer.host && referrer.host.slice(-11) === '.deezer.com') {
+                // Get the parameters from the URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const code = urlParams.get('code');
+                const args = urlParams.get('args');
+                const seed = urlParams.get('seed');
+
+                // validate we have all necessary parameters
+                if (code && args && seed) {
+                    // make sure redirect target is an IP address and port, and port is somewhere between 9000 and 9011
+                    const [hostIp, port] = args.split(':');
+                    if (hostIp && port && isPrivateIP(hostIp) && port >= 9000 && port <= 9011) {
+                        // Construct the new URL with the code parameter
+                        newUrl = `http://${args}/plugins/deezer/auth?seed=${seed}&code=${code}`;
+                    }
+                }
+            }
+
             console.log(`redirect to ${newUrl}`);
 
             return newUrl;
         }
-        
+
+        function isPrivateIP(ip) {
+            if (!ip.match(/^\d+\.\d+\.\d+\.\d+$/))
+                return false;
+
+            const parts = ip.split('.');
+            return parts[0] === '10'
+                || (parts[0] === '172' && parts[1] >= 16 && parts[1] <= 31)
+                || (parts[0] === '192' && parts[1] === '168')
+                || ip === '127.0.0.1';
+        }
+
         function followLink() {
             // Redirect to the new URL
             window.location.href = getLink();
-        }    
-        
+        }
+
         // Redirect to the new URL
         window.location.replace(getLink());
     </script>
