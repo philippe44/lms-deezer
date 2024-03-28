@@ -15,7 +15,7 @@ use constant GURL => 'https://www.deezer.com/ajax/gw-light.php';
 use constant UURL => 'https://media.deezer.com/v1/get_url';
 use constant IURL => 'https://e-cdns-images.dzcdn.net/images';
 
-use constant DEFAULT_LIMIT => 100;
+use constant DEFAULT_LIMIT => 200;
 use constant MAX_LIMIT => 2000;
 
 use constant DEFAULT_TTL => 86400;
@@ -33,6 +33,7 @@ use constant IMAGE_SIZES => {
 	playlist => '500x500',
 	podcast => '500x500',
 	episode => '500x500',
+	live => '500x500',
 };
 
 use constant SOUND_QUALITY => {
@@ -101,7 +102,7 @@ sub getImageUrl {
 sub typeOfItem {
 	my ($class, $item) = @_;
 
-	if ( $item->{type} && $item->{type} =~ /(?:playlist|artist|album|track|radio|genre|podcast|episode)/i ) {
+	if ( $item->{type} && $item->{type} =~ /(?:playlist|artist|album|track|radio|genre|podcast|episode|live)/i ) {
 		return $item->{type};
 	}
 	elsif ( $item->{podcast} ) {
@@ -180,7 +181,7 @@ sub cacheEpisodeMetadata {
 		};
 
 		# make sure we won't come back
-		$meta->{_complete} = 1 if $meta->{album} || $params->{cache};
+		$meta->{_complete} = 1 if $meta->{podcast} || $params->{cache};
 
 		# cache track metadata aggressively
 		$cache->set( 'deezer_episode_meta_' . $entry->{id}, $meta, time() + 90 * 86400);

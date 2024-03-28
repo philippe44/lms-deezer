@@ -10,12 +10,17 @@ use Digest::MD5 qw(md5_hex);
 use Slim::Utils::Cache;
 use Slim::Utils::Log;
 use Slim::Utils::Prefs;
+use Slim::Utils::Strings qw(cstring);
 
-use Plugins::Deezer::API qw();
+use Plugins::Deezer::API;
+use Plugins::Deezer::LiveProtocolHandler;
 
 my $cache = Slim::Utils::Cache->new();
 my $log = logger('plugin.deezer');
 my $prefs = preferences('plugin.deezer');
+my $sprefs = preferences('server');
+
+# ------------------------------- Home ------------------------------
 
 sub getHome {
 	my ( $client, $cb, $args, $params ) = @_;
@@ -33,7 +38,7 @@ sub getHome {
 			push @$items, {
 				title => $section->{title},
 				type => 'link',
-				url => \&_getSection,
+				url => \&getHomeSection,
 				passthrough => [ {
 					entries => $sectionItems,
 					title => $section->{title},
@@ -45,7 +50,7 @@ sub getHome {
 	} );
 }
 
-sub _getSection {
+sub getHomeSection {
 	my ( $client, $cb, $args, $params ) = @_;
 
 	my $api = Plugins::Deezer::Plugin::getAPIHandler($client);
@@ -66,7 +71,7 @@ sub _getSection {
 				image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder', 'track'),
 				type => 'playlist',
 				url => \&_getTarget,
-				passthrough => [ { 
+				passthrough => [ {
 					id => $item->{id},
 					handler => \&_mixes,
 				} ],
@@ -81,18 +86,24 @@ sub _getSection {
 				}, 'usePlaceholder', 'artist'),
 				type => 'playlist',
 				url => \&_getTarget,
-				passthrough => [ { 
+				passthrough => [ {
 					id => $item->{id},
 					handler => \&_smart,
 				} ],
 			};
-		} else {
+		} elsif ($entry->{type} =~ /show|livestream/) {
+			# this comes from radio/podcast previous streaming (for "continue streaming")
+			$item = _renderItem($client, $entry);
+		} elsif (Plugins::Deezer::API->typeOfItem($entry)) {
+			# this is regular items supported by mainline (can come from "continue streaming")
 			$item = {
 				%$item,
 				title => $entry->{title},
 				type => $entry->{type},
 			};
 			$item = Plugins::Deezer::Plugin::renderItem($client, $item, { addArtistToTitle => 1 });
+		} else {
+			next;
 		}
 
 		push @$items, $item;
@@ -107,42 +118,153 @@ sub _getTarget {
 	my $api = Plugins::Deezer::Plugin::getAPIHandler($client);
 
 	$params->{handler}->( $api, sub {
-		my $items = Plugins::Deezer::Plugin::_renderTracks(shift);
+		my $items = [ map { Plugins::Deezer::Plugin::renderItem($client, $_) } @{$_[0]} ];
 		$cb->( { items => $items } );
 	}, $params->{id} );
 }
 
-#----------------------------- ASYNC domain -------------------------------
+# ------------------------------ LiveRadio -----------------------------
+
+sub getWebItems {
+	my ( $client, $cb, $args, $params ) = @_;
+
+	my $api = Plugins::Deezer::Plugin::getAPIHandler($client);
+
+	_pageItems( $api, sub {
+		my $modules = $_[0];
+
+		my $items = [];
+
+		foreach my $module (@$modules) {
+			push @$items, _renderModule($module) if $module->{target} =~ /channels|podcasts/;
+		}
+
+		$cb->( { items => $items || []} );
+	}, "channels/radios" );
+}
+
+sub getItems {
+	my ( $client, $cb, $args, $params ) = @_;
+
+	if ( $params->{items} ) {
+		main::INFOLOG && $log->is_info && $log->info("Already got everything for $params->{target}");
+		my $items = _renderItems($client, $params->{items});
+
+		$cb->( { items => $items || []} );
+	} else {
+		my $api = Plugins::Deezer::Plugin::getAPIHandler($client);
+
+		main::INFOLOG && $log->is_info && $log->info("Fetching all items for $params->{target}");
+		_pageItems( $api, sub {
+			my $sections = shift;
+
+			my $items = scalar @$sections == 1 ?
+						_renderItems($client, $sections->[0]->{items}) :
+						[ map { _renderModule($_) } @$sections ];
+
+			$cb->( { items => $items || []} );
+		}, $params->{target} );
+	}
+}
+
+sub _renderModule {
+	my ($entry) = @_;
+
+	my $passthrough = { target => $entry->{target} };
+	$passthrough->{items} = $entry->{items} unless $entry->{hasMoreItems};
+
+	return {
+		title => $entry->{title},
+		type => 'link',
+		url => \&getItems,
+		passthrough => [ $passthrough ]
+	};
+}
+
+sub _renderItems {
+	my ($client, $results) = @_;
+
+	return [ map {
+		_renderItem($client, $_)
+	} @$results ];
+}
+
+sub _renderItem {
+	my ($client, $entry) = @_;
+
+	if ( $entry->{type} =~ /livestream/ ) {
+
+		my $image = Plugins::Deezer::API->getImageUrl( {
+						md5_image => $entry->{pictures}->[0]->{md5},
+						picture_type => $entry->{pictures}->[0]->{type},
+		}, 'usePlaceholder', 'live');
+		$cache->set("deezer_live_image_$entry->{id}", $image, '30 days');
+
+		return {
+			name => $entry->{title},
+			favorites_title => $entry->{title} . ' - ' . cstring($client, 'PLUGIN_DEEZER_ON_DEEZER'),
+			type => 'audio',
+			url => "deezerlive://$entry->{id}",
+			image => $image,
+		};
+
+	} elsif ( $entry->{type} =~ /show/ ) {
+
+		# fabricate an expected podcast entry to fit existing model
+		my $item = {
+			title => $entry->{title},
+			description => $entry->{description},
+			id => $entry->{id},
+			type => 'podcast',
+			md5_image => $entry->{pictures}->[0]->{md5},
+			picture_type => $entry->{pictures}->[0]->{type},
+		};
+
+		return Plugins::Deezer::Plugin::renderItem($client, $item);
+
+	} elsif ( $entry->{type} =~ /channel/ ) {
+
+		my $passthrough = { target => $entry->{target} };
+		$passthrough->{items} = $entry->{items} unless $entry->{hasMoreItems};
+
+		return  {
+			title => $entry->{title},
+			type => 'link',
+			url => \&getItems,
+			image => Plugins::Deezer::API->getImageUrl( {
+						md5_image => $entry->{pictures}->[0]->{md5},
+						picture_type => $entry->{pictures}->[0]->{type},
+			}, 'usePlaceholder', 'live'),
+			passthrough => [ $passthrough ]
+		}
+
+	}
+
+	return { };
+}
+
+#
+# ========================= ASYNC package ==========================
+#
+
+# ------------------------------- Home ----------------------------
 
 sub _home {
 	my ($self, $cb) = @_;
 
-	# we need the order of that query to be always the same so that cache key 
-	# works, but encode_json does not guaranty that
-	my $language = lc(preferences('server')->get('language'));
-	
-	state $home = {
-		PAGE => 'home',
-		VERSION => '2.5',
-		SUPPORT => {
-			'horizontal-grid' => ['album','artist','artistLineUp','channel','livestream','flow','playlist','radio','show','smarttracklist','track'],
-			'horizontal-list' => ['track','song'],
-			'long-card-horizontal-grid' => ['album','artist','artistLineUp','channel','livestream','flow','playlist','radio','show','smarttracklist','track'],
-		},
-		LANG => $language,
-	};
-	
-	state $jsonHome = encode_json($home);
-	
-	if ($home->{LANG} ne $language) {
-		$home->{LANG} = $language;
-		$jsonHome = encode_json($home);
-		main::INFOLOG && $log->is_info && $log->info("Language change detected");		
-	}
-	
 	my $params = {
+		_cacheKey => 'home_'.  $sprefs->get('language'),
 		method => 'page.get',
-		gateway_input => $jsonHome,
+		gateway_input => encode_json( {
+			PAGE => 'home',
+			VERSION => '2.5',
+			LANG => lc $sprefs->get('language'),
+			SUPPORT => {
+				'horizontal-grid' => ['album','artist','artistLineUp','channel','livestream','flow','playlist','radio','show','smarttracklist','track'],
+				'horizontal-list' => ['track','song'],
+				'long-card-horizontal-grid' => ['album','artist','artistLineUp','channel','livestream','flow','playlist','radio','show','smarttracklist','track'],
+			}
+		} )
 	};
 
 	_userQuery( $self, sub {
@@ -188,16 +310,75 @@ sub _smart {
 	}, $params, $content );
 }
 
+# ------------------------------ WebRadio -----------------------------
+
+sub _pageItems {
+	my ( $self, $cb, $page ) = @_;
+
+	my $params = {
+		_cacheKey => "web_$page" . '_' . $sprefs->get('language'),
+		method => 'page.get',
+		gateway_input => encode_json( {
+			PAGE => $page,
+			VERSION => '2.5',
+			LANG => lc $sprefs->get('language'),
+			SUPPORT => {
+				grid => ['channel','livestream','playlist','radio','show'],
+				'horizontal-grid' => ['channel','livestream','flow','playlist','radio','show'],
+				'long-card-horizontal-grid' => ['channel','livestream','flow','playlist','radio','show','smarttracklist','track'],
+			}
+		} )
+	};
+
+	_userQuery( $self, sub {
+		my $results = $_[0]->{sections};
+		$cb->($results || []);
+	}, $params );
+}
+
+sub liveStream {
+	my ( $self, $cb, $id ) = @_;
+
+	$self->_getUserContext( sub {
+		my ($tokens, $mode) = @_;
+		return $cb->() unless $tokens;
+
+		my $args = {
+			method => 'livestream.getData',
+			api_token => $tokens->{csrf},
+			_contentType => 'application/json',
+		};
+
+		my $content = encode_json( {
+			livestream_id => $id,
+			supported_codecs => ['mp3', 'aac'],
+		} );
+
+		$self->_ajax( sub {
+			my $result = shift;
+			my $urls = $result->{results}->{LIVESTREAM_URLS}->{data} if $result->{results}->{LIVESTREAM_URLS};
+			$cb->($urls);
+		}, $args, $content );
+	} );
+}
+
+# ------------------------------ Tools -----------------------------
+
 sub _userQuery {
 	my ($self, $cb, $params, $content) = @_;
 
-	my $ttl = delete $params->{_ttl} || 15*60;
+	my $ttl = delete $params->{_ttl} || 15 * 60;
+	my $cacheKey = delete $params->{_cacheKey};
 
-	# serialize query parameters and content but hash them as they can be 
-	# very lenghty (Perl has key order is undetermined).
-	my $cacheKey = 	join(':', map {	$_ . $params->{$_} } sort grep { $_ !~ /^_/ } keys %$params );
-	$cacheKey .= join(':', map { $_ . $content->{$_} } sort keys %$content) if $content && %$content;
-	$cacheKey = 'deezer_custom_' . $self->userId . "_" . md5_hex($cacheKey);
+	if (!$cacheKey) {
+		# serialize query parameters and content but hash them as they can be
+		# very lenghty (Perl hash key order is undetermined).
+		$cacheKey = join(':', map {	$_ . $params->{$_} } sort grep { $_ !~ /^_/ } keys %$params );
+		$cacheKey .= join(':', map { $_ . $content->{$_} } sort keys %$content) if $content && %$content;
+		$cacheKey = md5_hex($cacheKey);
+	}
+
+	$cacheKey = 'deezer_custom_' . $self->userId . "_$cacheKey";
 	main::INFOLOG && $log->is_info && $log->info("Getting 'custom' data with cachekey $cacheKey");
 
 	if (my $cached = $cache->get($cacheKey)) {
@@ -215,16 +396,21 @@ sub _userQuery {
 			api_token => $tokens->{csrf},
 		};
 
+		# might be empty, so must be undef then
+		my $data = encode_json($content) if $content;
+
 		$self->_ajax( sub {
 			my $results = $_[0]->{results} if $_[0];
 
 			$cache->set($cacheKey, $results, $ttl) if $results;
 			$cb->($results);
-		}, $args, encode_json($content || {}) );
+		}, $args, $data );
 	} );
 }
 
-#----------------------------- API domain -------------------------------
+#
+# ========================= API package ==========================
+#
 
 sub _cacheTrackMetadata {
 	my ($tracks) = @_;
@@ -253,8 +439,8 @@ sub _cacheTrackMetadata {
 			disc => $entry->{DISK_NUMBER},
 			tracknum => $entry->{TRACK_NUMBER},
 		};
-		
-		# make sure we won't come back	
+
+		# make sure we won't come back
 		$meta->{_complete} = 1 if $meta->{tracknum};
 
 		# cache track metadata aggressively

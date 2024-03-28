@@ -66,6 +66,8 @@ sub initPlugin {
 	my $class = shift;
 
 	$prefs->init({
+		liverate => 128,
+		liveformat => 'mp3',
 		quality => 'HIGH',
 		serial => '29436f4b2c5b2b552e4c221b2d7c7a4e7a336c002d7278512e486f1f2c677d432b1c224e29522c0b280e7f42750f7b43794a271c7d652b06744c5454795f6c4e781f51197d742e077b5b344e7b0e694d7e4c271e2c1c7c032c4f794e786060062b4260432f306b40',
 	});
@@ -337,7 +339,12 @@ sub handleFeed {
 		image => 'plugins/Deezer/html/rss.png',
 		type  => 'link',
 		url   => \&getPodcasts,
-	}, {
+	},{
+		name => cstring($client, 'RADIO'),
+		image => 'plugins/Deezer/html/radio.png',
+		type  => 'link',
+		url => \&Plugins::Deezer::Custom::getWebItems,
+	},{
 		name  => cstring($client, 'SEARCH'),
 		image => 'html/images/search.png',
 		type => 'outline',

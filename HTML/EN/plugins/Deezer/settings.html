@@ -54,4 +54,19 @@
 		</select>
 	[% END %]
 
+	[% WRAPPER setting title="PLUGIN_DEEZER_LIVE_PARAMS" desc="PLUGIN_DEEZER_LIVE_PARAMS_DESC" %]
+		[% "STREAM_FORMAT" | string %]
+		<select class="stdedit" name="pref_liveformat" id="format">	
+		[% FOREACH entry IN ['mp3', 'aac'] %]
+			<option [% IF entry == prefs.pref_liveformat %]selected[% END %] value="[% entry %]">[% entry %]</option>
+		[% END %]
+		</select>
+		[% "BITRATE" | string %]
+		<select class="stdedit" name="pref_liverate" id="rate">		
+		[% FOREACH entry IN ['64', '96', '128', '160', '192'] %]
+			<option [% IF entry == prefs.pref_liverate %]selected[% END %] value="[% entry %]">[% entry %]</option>
+		[% END %]
+		</select>
+	[% END %]
+
 [% PROCESS settings/footer.html %]

@@ -327,3 +327,10 @@ PLUGIN_DEEZER_REMOVE_FROM_PLAYLIST
 	FR	Supprimer de cette liste de lecture
 	DE	Aus diese Wiedergabeliste entfernen
 
+PLUGIN_DEEZER_LIVE_PARAMS
+	EN	Live streaming parameters
+	FR	Paramètres streaming en direct
+
+PLUGIN_DEEZER_LIVE_PARAMS_DESC
+	EN	Specify minimum bitrate and desired format for live streaming. Closest available will be selected
+	FR	Spécifie le débit minimum et le format désiré pour le streaming en direct. Le plus proche sera sélectionné

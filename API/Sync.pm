@@ -50,9 +50,8 @@ sub album {
 sub albumTracks {
 	my ($class, $userId, $id, $title) = @_;
 
-	my $album = $class->_get("/album/$id", $userId);
-	my $tracks = $album->{tracks}->{data} if $album;
-	$tracks = Plugins::Deezer::API->cacheTrackMetadata($tracks) if $tracks;
+	my $tracks = $class->_get("/album/$id/tracks", $userId);
+	$tracks = Plugins::Deezer::API->cacheTrackMetadata($tracks->{data}) if $tracks;
 
 	return $tracks;
 }
