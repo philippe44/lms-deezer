@@ -334,3 +334,11 @@ PLUGIN_DEEZER_LIVE_PARAMS
 PLUGIN_DEEZER_LIVE_PARAMS_DESC
 	EN	Specify minimum bitrate and desired format for live streaming. Closest available will be selected
 	FR	Spécifie le débit minimum et le format désiré pour le streaming en direct. Le plus proche sera sélectionné
+
+PLUGIN_DEEZER_CHANNELS
+	EN	Channels
+	FR	Canaux
+
+PLUGIN_DEEZER_EPISODES
+	EN	Episodes
+	FR	Episodes

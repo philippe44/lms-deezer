@@ -133,7 +133,12 @@ sub getWebItems {
 	_pageItems( $api, sub {
 		my $modules = $_[0];
 
-		my $items = [];
+		my $items = [ {
+			name => cstring($client, 'SEARCH'),
+			type  => 'search',
+			url   => \&search,
+			# image => 'html/images/search.png',
+		} ];
 
 		foreach my $module (@$modules) {
 			push @$items, _renderModule($module) if $module->{target} =~ /channels|podcasts/;
@@ -141,6 +146,52 @@ sub getWebItems {
 
 		$cb->( { items => $items || []} );
 	}, "channels/radios" );
+}
+
+sub search {
+	my ( $client, $cb, $args, $params ) = @_;
+
+	$args->{search} ||= $params->{query};
+
+	Plugins::Deezer::Plugin::getAPIHandler($client)->gwSearch(sub {
+		my $results = shift;
+
+		my $items = [];
+
+		push @$items, {
+			name => cstring($client, 'RADIO'),
+			image => 'plugins/Deezer/html/radio.png',
+			type => 'outline',
+			items => _renderItems($client, $results->{LIVESTREAM}->{data}),
+		} if $results->{LIVESTREAM}->{count};
+
+		push @$items, {
+			name => cstring($client, 'PLUGIN_DEEZER_CHANNELS'),
+			image => 'plugins/Deezer/html/radio.png',
+			type => 'outline',
+			items => _renderItems($client, $results->{CHANNEL}->{data}),
+		} if $results->{CHANNEL}->{count};
+
+		push @$items, {
+			name => cstring($client, 'PLUGIN_PODCAST'),
+			image => 'plugins/Deezer/html/podcast.png',
+			type => 'outline',
+			items => _renderItems($client, $results->{SHOW}->{data}),
+		} if $results->{SHOW}->{count};
+
+		# for episodes, we can cache them an re-use usual backend
+		if ($results->{EPISODE}->{count}) {
+			my $episodes = _cacheEpisodeMetadata($results->{EPISODE}->{data});
+			push @$items, {
+				name => cstring($client, 'PLUGIN_DEEZER_EPISODES'),
+				image => 'plugins/Deezer/html/rss.png',
+				type => 'outline',
+				items => [ map { Plugins::Deezer::Plugin::renderItem($client, $_)} @$episodes ],
+			};
+		}
+
+		$cb->( { items => $items } );
+	}, $args);
 }
 
 sub getItems {
@@ -177,7 +228,7 @@ sub _renderModule {
 		title => $entry->{title},
 		type => 'link',
 		url => \&getItems,
-		passthrough => [ $passthrough ]
+		passthrough => [ $passthrough ],
 	};
 }
 
@@ -222,8 +273,23 @@ sub _renderItem {
 
 		return Plugins::Deezer::Plugin::renderItem($client, $item);
 
+	} elsif ( $entry->{__TYPE__} =~ /show/ ) {
+
+		# fabricate an expected podcast entry to fit existing model
+		my $item = {
+			title => $entry->{SHOW_NAME},
+			description => $entry->{SHOW_DESCRIPTION},
+			id => $entry->{SHOW_ID},
+			type => 'podcast',
+			md5_image => $entry->{SHOW_ART_MD5},
+			picture_type => $entry->{SHOW_TYPE} || 'talk',
+		};
+
+		return Plugins::Deezer::Plugin::renderItem($client, $item);
+
 	} elsif ( $entry->{type} =~ /channel/ ) {
 
+		my $image = $entry->{logo_image} || $entry->{pictures}->[0];
 		my $passthrough = { target => $entry->{target} };
 		$passthrough->{items} = $entry->{items} unless $entry->{hasMoreItems};
 
@@ -232,9 +298,9 @@ sub _renderItem {
 			type => 'link',
 			url => \&getItems,
 			image => Plugins::Deezer::API->getImageUrl( {
-						md5_image => $entry->{pictures}->[0]->{md5},
-						picture_type => $entry->{pictures}->[0]->{type},
-			}, 'usePlaceholder', 'live'),
+						md5_image => $image->{md5},
+						picture_type => $image->{type},
+			}, 'usePlaceholder', 'channel'),
 			passthrough => [ $passthrough ]
 		}
 
@@ -253,7 +319,7 @@ sub _home {
 	my ($self, $cb) = @_;
 
 	my $params = {
-		_cacheKey => 'home_'.  $sprefs->get('language'),
+		_cacheKey => 'home:' . $sprefs->get('language') . '_' . $self->userId,
 		method => 'page.get',
 		gateway_input => encode_json( {
 			PAGE => 'home',
@@ -263,6 +329,7 @@ sub _home {
 				'horizontal-grid' => ['album','artist','artistLineUp','channel','livestream','flow','playlist','radio','show','smarttracklist','track'],
 				'horizontal-list' => ['track','song'],
 				'long-card-horizontal-grid' => ['album','artist','artistLineUp','channel','livestream','flow','playlist','radio','show','smarttracklist','track'],
+				'slideshow' => ['channel','livestream','playlist','show','smarttracklist','user'],
 			}
 		} )
 	};
@@ -316,16 +383,17 @@ sub _pageItems {
 	my ( $self, $cb, $page ) = @_;
 
 	my $params = {
-		_cacheKey => "web_$page" . '_' . $sprefs->get('language'),
+		_cacheKey => 'web:' . $sprefs->get('language') . "_$page",
 		method => 'page.get',
 		gateway_input => encode_json( {
 			PAGE => $page,
 			VERSION => '2.5',
 			LANG => lc $sprefs->get('language'),
 			SUPPORT => {
-				grid => ['channel','livestream','playlist','radio','show'],
+				'grid' => ['channel','livestream','playlist','radio','show'],
 				'horizontal-grid' => ['channel','livestream','flow','playlist','radio','show'],
 				'long-card-horizontal-grid' => ['channel','livestream','flow','playlist','radio','show','smarttracklist','track'],
+				'slideshow' => ['channel','livestream','playlist','show','smarttracklist','user'],
 			}
 		} )
 	};
@@ -378,7 +446,7 @@ sub _userQuery {
 		$cacheKey = md5_hex($cacheKey);
 	}
 
-	$cacheKey = 'deezer_custom_' . $self->userId . "_$cacheKey";
+	$cacheKey = 'deezer_custom_' . $cacheKey;
 	main::INFOLOG && $log->is_info && $log->info("Getting 'custom' data with cachekey $cacheKey");
 
 	if (my $cached = $cache->get($cacheKey)) {
@@ -418,7 +486,7 @@ sub _cacheTrackMetadata {
 
 	return [ map {
 		my $entry = $_;
-		my $oldMeta = $cache->get('deezer_meta_' . $entry->{id}) || {};
+		my $oldMeta = $cache->get('deezer_meta_' . $entry->{SNG_ID}) || {};
 		my $icon = Plugins::Deezer::API->getImageUrl( {
 			md5_image => $entry->{ALB_PICTURE},
 			type => 'track',
@@ -444,10 +512,53 @@ sub _cacheTrackMetadata {
 		$meta->{_complete} = 1 if $meta->{tracknum};
 
 		# cache track metadata aggressively
-		$cache->set( 'deezer_meta_' . $meta->{id}, $meta, time() + 90 * 86400);
+		$cache->set( 'deezer_meta_' . $meta->{id}, $meta, '90days');
 
 		$meta;
 	} @$tracks ];
+}
+
+sub _cacheEpisodeMetadata {
+	my ($episodes) = @_;
+	return [] unless $episodes;
+
+	return [ map {
+		my $entry = $_;
+		my $oldMeta = $cache->get( 'deezer_episode_meta_' . $entry->{EPISODE_ID}) || {};
+		my $icon = Plugins::Deezer::API->getImageUrl( {
+			md5_image => $entry->{EPISODE_IMAGE_MD5},
+			type => 'episode',
+			picture_type => 'talk',
+		} );
+		my $podcast = {
+			id => $entry->{SHOW_ID},
+			title => $entry->{SHOW_NAME},
+			descrption => $entry->{SHOW_DESCRIPTION},
+		};
+
+		# consolidate metadata in case parsing of stream came first (huh?)
+		my $meta = {
+			%$oldMeta,
+			id => $entry->{EPISODE_ID},
+			title => $entry->{EPISODE_TITLE},
+			podcast => $podcast,
+			duration => $entry->{DURATION},
+			icon => $icon,
+			cover => $icon,
+			# we don't have link
+			# link => $entry->{EPISODE_DIRECT_STREAM},
+			comment => $entry->{SHOW_DESCRIPTION},
+			date => substr($entry->{EPISODE_PUBLISHED_TIMESTAMP}, 0, 10),
+		};
+
+		# make sure we won't come back
+		$meta->{_complete} = 1 if $meta->{podcast}->{id} && $meta->{link};
+
+		# cache track metadata aggressively
+		$cache->set( 'deezer_episode_meta_' . $meta->{id}, $meta, '90days');
+
+		$meta;
+	} @$episodes ];
 }
 
 

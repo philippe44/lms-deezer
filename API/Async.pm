@@ -129,6 +129,35 @@ sub search {
 	});
 }
 
+sub gwSearch {
+	my ($self, $cb, $args) = @_;
+
+	$self->_getUserContext( sub {
+		my ($tokens, $mode) = @_;
+		return $cb->() unless $tokens;
+
+		my $params = {
+			method => 'deezer.pageSearch',
+			api_token => $tokens->{csrf},
+			_contentType => 'application/json',
+			_cacheKey => 'pageSearch:' . $args->{search},
+		};
+
+		my $content = encode_json( {
+			nb => $args->{limit} || DEFAULT_LIMIT,
+			start => 0,
+			suggest => 'false',
+			top_tracks => 'false',
+			artist_suggest => 'false',
+			query => $args->{search}
+		} );
+
+		$self->_ajax( sub {
+			$cb->($_[0]->{results});
+		}, $params, $content );
+	} );
+}
+
 sub track {
 	my ($self, $cb, $id) = @_;
 
@@ -713,6 +742,8 @@ sub _ajax {
 	my ($self, $cb, $params, $content) = @_;
 
 	my $cookies = delete $params->{_cookies};
+	my $cacheKey = 'deezer_ajax_' . delete $params->{_cacheKey} if $params->{_cacheKey};
+	my $ttl = delete $params->{_ttl} || USER_CONTENT_TTL;
 	my %headers = ( 'Content-Type' => delete $params->{_contentType} || 'application/x-www-form-urlencoded' );
 	$headers{Cookie} = join ' ', map { "$_=$cookies->{$_}" } keys %$cookies if $cookies;
 
@@ -727,6 +758,11 @@ sub _ajax {
 	my $method = $content ? 'post' : 'get';
 	main::INFOLOG && $log->is_info && $log->info(uc($method) . " ?$query ", $content ? Data::Dump::dump($content) : '');
 
+	if ( $cacheKey && (my $cached = $cache->get($cacheKey)) ) {
+		main::INFOLOG && $log->is_info && $log->info("returning from cache $cacheKey");
+		return $cb->($cached);
+	}
+
 	Slim::Networking::SimpleAsyncHTTP->new(
 		sub {
 			my $result = eval { from_json(shift->content) };
@@ -734,6 +770,7 @@ sub _ajax {
 			$@ && $log->error($@);
 			$log->debug(Data::Dump::dump($result)) if $@ || (main::DEBUGLOG && $log->is_debug);
 
+			$cache->set($cacheKey, $result, $ttl) if $cacheKey;
 			$cb->($result);
 		},
 		sub {

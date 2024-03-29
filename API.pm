@@ -34,6 +34,7 @@ use constant IMAGE_SIZES => {
 	podcast => '500x500',
 	episode => '500x500',
 	live => '500x500',
+	channel => '256x0',
 };
 
 use constant SOUND_QUALITY => {
@@ -149,7 +150,7 @@ sub cacheTrackMetadata {
 		$meta->{_complete} = 1 if $meta->{tracknum} || ($params && $params->{cache});
 
 		# cache track metadata aggressively
-		$cache->set( 'deezer_meta_' . $entry->{id}, $meta, time() + 90 * 86400);
+		$cache->set( 'deezer_meta_' . $entry->{id}, $meta, '90days');
 
 		$meta;
 	} @$tracks ];
@@ -184,7 +185,7 @@ sub cacheEpisodeMetadata {
 		$meta->{_complete} = 1 if $meta->{podcast} || $params->{cache};
 
 		# cache track metadata aggressively
-		$cache->set( 'deezer_episode_meta_' . $entry->{id}, $meta, time() + 90 * 86400);
+		$cache->set( 'deezer_episode_meta_' . $entry->{id}, $meta, '90days');
 
 		$meta;
 	} @$episodes ];
