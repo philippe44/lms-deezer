@@ -169,6 +169,7 @@ sub search {
 			name => cstring($client, 'PLUGIN_DEEZER_CHANNELS'),
 			image => 'plugins/Deezer/html/radio.png',
 			type => 'outline',
+			unfold => $results->{CHANNEL}->{count} == 1,
 			items => _renderItems($client, $results->{CHANNEL}->{data}),
 		} if $results->{CHANNEL}->{count};
 
@@ -293,6 +294,8 @@ sub _renderItem {
 		my $passthrough = { target => $entry->{target} };
 		$passthrough->{items} = $entry->{items} unless $entry->{hasMoreItems};
 
+		main::INFOLOG && $log->is_info && $log->info("unknown item type", Data::Dump::dump($entry));
+
 		return  {
 			title => $entry->{title},
 			type => 'link',
@@ -306,8 +309,18 @@ sub _renderItem {
 			passthrough => [ $passthrough ]
 		}
 
+	} elsif ( $entry->{type} =~ /playlist/ ) {
+
+		# fabricate an expected playlist entry to fit existing model
+		$entry->{md5_image} = $entry->{pictures}->[0]->{md5};
+		$entry->{picture_type} = $entry->{pictures}->[0]->{type};
+		$entry->{creator}->{id} = $entry->{data}->{PARENT_USER_ID};
+		$entry->{user}->{name} = 'n/a';
+
+		return Plugins::Deezer::Plugin::renderItem($client, $entry);
 	}
 
+	main::INFOLOG && $log->is_info && $log->info("unknown item type", Data::Dump::dump($entry));
 	return { };
 }
 
