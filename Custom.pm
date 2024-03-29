@@ -297,6 +297,8 @@ sub _renderItem {
 			title => $entry->{title},
 			type => 'link',
 			url => \&getItems,
+			favorites_title => $entry->{title} . ' - ' . cstring($client, 'PLUGIN_DEEZER_ON_DEEZER'),
+			favorites_url => 'deezerlive://channel:' . $entry->{target},
 			image => Plugins::Deezer::API->getImageUrl( {
 						md5_image => $image->{md5},
 						picture_type => $image->{type},

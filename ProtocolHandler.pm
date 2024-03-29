@@ -14,7 +14,7 @@ use Slim::Utils::Log;
 use Slim::Utils::Misc;
 use Slim::Utils::Prefs;
 use Slim::Utils::Timers;
-use Slim::Utils::Errno qw(EINTR EWOULDBLOCK);
+use Slim::Utils::Errno qw(EWOULDBLOCK);
 use Slim::Utils::Scanner::Remote;
 use Slim::Utils::Strings qw(cstring);
 
@@ -221,11 +221,11 @@ sub _sysread {
 	if ( ${*$self}{deezer_align} ) {
 		my $bytes = $self->SUPER::_sysread(my $buffer, ${*$self}{deezer_align});
 
-		main::INFOLOG && $log->info("Aligning ($bytes) of ${*$self}{deezer_align} with count ${*$self}{deezer_count}");
+		main::INFOLOG && $log->info("Aligning ($bytes) of ${*$self}{deezer_align} with count ${*$self}{deezer_count}") if defined $bytes;
 		${*$self}{deezer_align} -= $bytes;
 
 		if ( ${*$self}{deezer_align} ) {
-			$! = EINTR;
+			$! ||= EWOULDBLOCK;
 			return undef;
 		}
 	}
@@ -237,7 +237,7 @@ sub _sysread {
 
 		# really nothing to work on, come back later
 		if (!defined $bytes) {
-			$! = EINTR;
+			$! ||= EWOULDBLOCK;
 			return undef;
 		}
 
@@ -268,7 +268,7 @@ sub _sysread {
 	}
 
 	# not been replenished enough, come back later
-	$! = EINTR;
+	$! ||= EWOULDBLOCK;
 	return undef;
 }
 

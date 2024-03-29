@@ -15,11 +15,31 @@ my $prefs = preferences('plugin.deezer');
 my $log = logger('plugin.deezer');
 
 # https://www.deezer.com/livestream/611754312
-my $URL_REGEX = qr{^https://(?:\w+\.)?deezer.com/(live)/([a-z\d-]+)}i;
-my $URI_REGEX = qr{^deezerlive://(\d+)}i;
+my $URL_REGEX = qr{^https://(?:\w+\.)?deezer.com/(live|channel)/(.]+)}i;
+my $URI_REGEX = qr{^deezerlive://(channel|):?(.+)}i;
 Slim::Player::ProtocolHandlers->registerURLHandler($URL_REGEX, __PACKAGE__);
 Slim::Player::ProtocolHandlers->registerURLHandler($URI_REGEX, __PACKAGE__);
 Slim::Player::ProtocolHandlers->registerHandler('deezerlive', 'Plugins::Deezer::LiveProtocolHandler');
+
+sub explodePlaylist {
+	my ( $class, $client, $url, $cb ) = @_;
+
+	my ($type, $id) = $url =~ $URL_REGEX;
+
+	if ( !($type && $id) ) {
+		($type, $id) = $url =~ $URI_REGEX;
+	}
+
+	main::INFOLOG && $log->is_info && $log->info("Getting $url, type:$type, id:$id");
+
+	if (!$type) {
+		$cb->( [ $url ] );	
+	} elsif ($type eq 'channel') {
+		Plugins::Deezer::Custom::getItems($client, $cb, { }, { target => $id } );
+	} else {
+		$cb->([]);
+	}
+}
 
 sub scanUrl {
 	my ( $class, $url, $args ) = @_;
