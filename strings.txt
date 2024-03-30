@@ -350,5 +350,4 @@ PLUGIN_DEEZER_FLOW_DEFAULT
 
 PLUGIN_DEEZER_FLOW_DISCOVERY
 	EN	Discovery Flow
-  FR  Flow découverte
-  
+	FR	Flow découverte
