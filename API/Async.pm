@@ -236,10 +236,13 @@ sub flowTracks {
 			_contentType => 'application/json',
 		};
 
-		my $content = encode_json( {
-			config_id => ($params->{mode} eq 'genre' ?  'genre-' : '') . $params->{type},
-			user_id => $self->userId,
-		} );
+		my $content = { user_id => $self->userId };
+		if ($params->{mode} =~ /genre|mood/ ) {
+			$content->{config_id} = ($params->{mode} eq 'genre' ?  'genre-' : '') . $params->{type};
+		} else {
+			$content->{tuner} = $params->{mode};
+		}	
+		$content = encode_json($content);	
 
 		$self->_ajax( sub {
 			my $result = shift;
@@ -346,9 +349,8 @@ sub genreByType {
 	my ($self, $cb, $id, $type) = @_;
 	$self->_get("/genre/$id/$type", sub {
 		$cb->($_[0]->{data} || []);
-	}, { _ttl => $type =~ /podcast/ ? USER_CONTENT_TTL : DEFAULT_TTL });
+	}, { _ttl => $type eq 'podcasts' ? USER_CONTENT_TTL : DEFAULT_TTL });
 }
-
 
 sub playlist {
 	my ($self, $cb, $id) = @_;
@@ -418,7 +420,7 @@ sub getFavorites {
 			$items = Plugins::Deezer::API->cacheTrackMetadata($items) if $items && $type eq 'tracks';
 
 			# invalidate our own playlists whose update time is more recent than last lookup
-			if (defined $timestamp && $type =~/playlist/) {	
+			if (defined $timestamp && $type eq 'playlists') {	
 				foreach my $playlist (@$items) {
 					next unless $self->userId == $playlist->{creator}->{id} && $playlist->{time_mod} > $timestamp;
 					main::INFOLOG && $log->is_info && $log->info("Invalidating playlist $playlist->{id}");
@@ -470,7 +472,7 @@ sub getCollectionFingerprint {
 	my ($self, $cb, $type) = @_;
 
 	my $userId = $self->userId || return $cb->();
-	my $sort = $type =~ /playlists/ ? 'time_mod' : 'time_add';
+	my $sort = $type eq 'playlists' ? 'time_mod' : 'time_add';
 
 	$self->_get("/user/me/$type", sub {
 		my $result = shift;
@@ -478,7 +480,7 @@ sub getCollectionFingerprint {
 		my $fingerprint = {
 			checksum => $result->{checksum},
 			# well, believe it or not the time recorded by Deezer includes TZ for playlist ONLY...
-			time => $result->{data}->[0]->{$sort} - ($type =~ /playlists/ ? $tzOffset : 0),
+			time => $result->{data}->[0]->{$sort} - ($type eq 'playlists' ? $tzOffset : 0),
 			total => $result->{total},
 		} if $result->{data};
 
@@ -497,8 +499,8 @@ sub updateFavorite {
 	my $access_token = $profile->{token} if $profile;
 	return $cb() unless $action && $type && $id && $access_token;
 
-	# well... we have a trailing 's' (I know this is hacky... and bad)
-	my $item = substr($type, 0, -1);
+	my $item = $type;
+	$type .= 's';
 
 	# make sure we'll force an update check next time
 	my $updated = $self->updated;
@@ -509,7 +511,7 @@ sub updateFavorite {
 		access_token => $access_token,
 	} );
 
-	my $method = ($action =~ /add/) ? 'POST' : 'DELETE';
+	my $method = ($action eq 'add') ? 'POST' : 'DELETE';
 	my $trace = $query =~ s/(access_token=)\w+/${1}***/r;
 	main::INFOLOG && $log->is_info && $log->info(uc($method) . " /user/me/$type?$trace");
 
@@ -539,7 +541,7 @@ sub updatePlaylist {
 		access_token => $access_token,
 	} );
 
-	my $method = ($action =~ /add/) ? 'POST' : 'DELETE';
+	my $method = ($action eq 'add') ? 'POST' : 'DELETE';
 	my $trace = $query =~ s/(access_token=)\w+/${1}***/r;
 	main::INFOLOG && $log->is_info && $log->info(uc($method) . " /playlist/$id/tracks?$trace");
 

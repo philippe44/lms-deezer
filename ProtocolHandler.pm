@@ -579,8 +579,8 @@ sub _getRadio{
 }
 
 sub _getFlow{
-	my ($flow, $type) = $_[0] =~ /deezer:\/\/(genre|mood):(.+)\.flow$/;
-	return $flow ? ($flow, $type) : ();
+	my ($flow, $type) = $_[0] =~ /deezer:\/\/(genre|mood|default|discovery)(?:\:(.+))?\.flow$/;
+	return $flow ? ($flow, $type || 'n/a') : ();
 }
 
 sub getPlayingId {
