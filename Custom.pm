@@ -244,7 +244,7 @@ sub _renderItems {
 sub _renderItem {
 	my ($client, $entry) = @_;
 
-	if ( $entry->{type} =~ /livestream/ ) {
+	if ( $entry->{type} eq 'livestream' ) {
 
 		my $image = Plugins::Deezer::API->getImageUrl( {
 						md5_image => $entry->{pictures}->[0]->{md5},
@@ -260,7 +260,7 @@ sub _renderItem {
 			image => $image,
 		};
 
-	} elsif ( $entry->{type} =~ /show/ ) {
+	} elsif ( $entry->{type} eq 'show' ) {
 
 		# fabricate an expected podcast entry to fit existing model
 		my $item = {
@@ -274,7 +274,7 @@ sub _renderItem {
 
 		return Plugins::Deezer::Plugin::renderItem($client, $item);
 
-	} elsif ( $entry->{__TYPE__} =~ /show/ ) {
+	} elsif ( $entry->{__TYPE__} eq 'show' ) {
 
 		# fabricate an expected podcast entry to fit existing model
 		my $item = {
@@ -288,7 +288,7 @@ sub _renderItem {
 
 		return Plugins::Deezer::Plugin::renderItem($client, $item);
 
-	} elsif ( $entry->{type} =~ /channel/ ) {
+	} elsif ( $entry->{type} eq 'channel' ) {
 
 		my $image = $entry->{logo_image} || $entry->{pictures}->[0];
 		my $passthrough = { target => $entry->{target} };
@@ -309,7 +309,7 @@ sub _renderItem {
 			passthrough => [ $passthrough ]
 		}
 
-	} elsif ( $entry->{type} =~ /playlist/ ) {
+	} elsif ( $entry->{type} eq 'playlist' ) {
 
 		# fabricate an expected playlist entry to fit existing model
 		$entry->{md5_image} = $entry->{pictures}->[0]->{md5};

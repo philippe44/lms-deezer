@@ -270,7 +270,7 @@ sub menuInfoWeb {
 							fixedParams => { action => 'add_to_playlist', id => $id },
 						},
 					},
-				} if $type =~ /track/;
+				} if $type eq 'track';
 
 			} else {
 				push @$items, { 
@@ -290,22 +290,22 @@ sub menuInfoWeb {
 					name => cstring($client, 'PLUGIN_DEEZER_ADD_TO_PLAYLIST'),
 					url => \&addToPlaylist,
 					passthrough => [ { id => $id } ],
-				} if $type =~ /track/;
+				} if $type eq 'track';
 			}
 
 			my $method;
 
-			if ( $type =~ /tracks/ ) {
+			if ( $type eq 'track' ) {
 				$method = \&_menuTrackInfo;
-			} elsif ( $type =~ /albums/ ) {
+			} elsif ( $type eq 'album' ) {
 				$method = \&_menuAlbumInfo;
-			} elsif ( $type =~ /artists/ ) {
+			} elsif ( $type eq 'artist' ) {
 				$method = \&_menuArtistInfo;
-			} elsif ( $type =~ /playlists/ ) {
+			} elsif ( $type eq 'playlist' ) {
 				$method = \&_menuPlaylistInfo;
-			} elsif ( $type =~ /podcasts/ ) {
+			} elsif ( $type eq 'podcast' ) {
 				$method = \&_menuPodcastInfo;
-			} elsif ( $type =~ /episodes/ ) {
+			} elsif ( $type eq 'episode' ) {
 				$method = \&_menuEpisodeInfo;
 			}
 
@@ -326,7 +326,7 @@ sub menuInfoWeb {
 				} );
 			}, $args->{params});
 
-		}, $type );
+		}, $type . 's' );
 
 	}, $request );
 }
@@ -400,7 +400,7 @@ sub addPlayingToFavorites {
 
 	Plugins::Deezer::Plugin::getAPIHandler($client)->updateFavorite( sub {
 		_completed($client, $cb);
-	}, 'add', 'tracks', $id );
+	}, 'add', 'track', $id );
 }
 
 #
@@ -449,7 +449,7 @@ sub menuAction {
 		$request->addParam('item_id', $key);
 		
 		# only items 'action' for now is to add to playlist
-		if ($action =~ /add_to_playlist/ ) {
+		if ($action eq 'add_to_playlist' ) {
 			Slim::Control::XMLBrowser::cliQuery( 'deezer_action', sub {
 				my ($client, $cb, $args) = @_;
 			
@@ -465,10 +465,10 @@ sub menuAction {
 		my $action = $request->getParam('_action');
 		main::INFOLOG && $log->is_info && $log->info("JSON RPC action $action for $id");
 		
-		if ($action =~ /remove_track/ ) {
+		if ($action eq 'remove_track' ) {
 			my $playlistId = $request->getParam('playlistId');
 			$api->updatePlaylist( sub { }, 'del', $playlistId, $id );
-		} elsif ($action =~ /add_track/ ) {
+		} elsif ($action eq 'add_track' ) {
 			# this is only used if we have a direct RPC menu set in addToPlaylist
 			my $playlistId = $request->getParam('playlistId');
 			$api->updatePlaylist( sub { }, 'add', $playlistId, $id );
@@ -523,7 +523,7 @@ sub menuBrowse {
 	Slim::Control::XMLBrowser::cliQuery('deezer_browse', sub {
 		my ($client, $cb, $args) = @_;
 
-		if ( $type =~ /album/ ) {
+		if ( $type eq 'album' ) {
 
 			Plugins::Deezer::Plugin::getAlbum($client, sub {
 				my $feed = $_[0];
@@ -531,7 +531,7 @@ sub menuBrowse {
 				$cb->($feed);
 			}, $args, { id => $id } );
 
-		} elsif ( $type =~ /artist/ ) {
+		} elsif ( $type eq 'artist' ) {
 
 			Plugins::Deezer::Plugin::getAPIHandler($client)->artist(sub {
 				my $feed = Plugins::Deezer::Plugin::renderItem( $client, $_[0] ) if $_[0];
@@ -542,19 +542,19 @@ sub menuBrowse {
 				$cb->($feed);
 			}, $id );
 
-		} elsif ( $type =~ /playlist/ ) {
+		} elsif ( $type eq 'playlist' ) {
 
 			# we don't need to memorize the feed as we won't redescend into it
 			Plugins::Deezer::Plugin::getPlaylist($client, $cb, $args, { id => $id } );
 
-		} elsif ( $type =~ /track/ ) {
+		} elsif ( $type eq 'track' ) {
 
 			# track must be in cache, no memorizing
 			my $cache = Slim::Utils::Cache->new;
 			my $track = Plugins::Deezer::Plugin::renderItem( $client, $cache->get('deezer_meta_' . $id), { addArtistToTitle => 1 } );
 			$cb->([$track]);
 
-		} elsif ( $type =~ /podcast/ ) {
+		} elsif ( $type eq 'podcast' ) {
 
 			# we need to re-acquire the podcast itself
 			Plugins::Deezer::Plugin::getAPIHandler($client)->podcast(sub {
@@ -565,7 +565,7 @@ sub menuBrowse {
 				} );
 			}, $id );
 
-		} elsif ( $type =~ /episode/ ) {
+		} elsif ( $type eq 'episode' ) {
 
 			# episode must be in cache, no memorizing
 			my $cache = Slim::Utils::Cache->new;

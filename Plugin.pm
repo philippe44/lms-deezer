@@ -269,12 +269,19 @@ sub handleFeed {
 		play => 'deezer://user/me/flow.dzr',
 		type => 'outline',
 		items => [{
-			name => cstring($client, 'PLUGIN_DEEZER_FLOW'),
+			name => cstring($client, 'PLUGIN_DEEZER_FLOW_DEFAULT'),
 			image => 'plugins/Deezer/html/flow.png',
 			on_select => 'play',
 			type => 'audio',
-			url => 'deezer://user/me/flow.dzr',
-			play => 'deezer://user/me/flow.dzr',
+			url => 'deezer://default.flow',
+			play => 'deezer://default.flow',
+		},{
+			name => cstring($client, 'PLUGIN_DEEZER_FLOW_DISCOVERY'),
+			image => 'plugins/Deezer/html/flow.png',
+			on_select => 'play',
+			type => 'audio',
+			url => 'deezer://discovery.flow',
+			play => 'deezer://discovery.flow',
 		},{
 			name => cstring($client, 'GENRES'),
 			image => 'html/images/genres.png',
@@ -657,7 +664,7 @@ sub _renderPlaylist {
 			info => {
 				command   => ['deezer_info', 'items'],
 				fixedParams => {
-					type => 'playlists',
+					type => 'playlist',
 					id => $item->{id},
 				},
 			},
@@ -695,7 +702,7 @@ sub _renderAlbum {
 			info => {
 				command   => ['deezer_info', 'items'],
 				fixedParams => {
-					type => 'albums',
+					type => 'album',
 					id => $item->{id},
 				},
 			},
@@ -749,7 +756,7 @@ sub _renderTrack {
 			info => {
 				command   => ['deezer_info', 'items'],
 				fixedParams => {
-					type => 'tracks',
+					type => 'track',
 					id => $item->{id},
 					playlistId => $playlistId,
 				},
@@ -783,7 +790,7 @@ sub _renderPodcast {
 			info => {
 				command   => ['deezer_info', 'items'],
 				fixedParams => {
-					type => 'podcasts',
+					type => 'podcast',
 					id => $item->{id},
 				},
 			},
@@ -822,7 +829,7 @@ sub _renderEpisode {
 			info => {
 				command   => ['deezer_info', 'items'],
 				fixedParams => {
-					type => 'episodes',
+					type => 'episode',
 					id => $item->{id},
 				},
 			},
@@ -886,7 +893,7 @@ sub _renderArtist {
 			info => {
 				command   => ['deezer_info', 'items'],
 				fixedParams => {
-					type => 'artists',
+					type => 'artist',
 					id => $item->{id},
 				},
 			},
