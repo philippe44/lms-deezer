@@ -360,17 +360,9 @@ sub playlist {
 sub playlistTracks {
 	my ($self, $cb, $id) = @_;
 
-	my $cacheKey = 'deezer_playlist_' . $id;
-
-	# we must do our own cache of playlist's tracks because we can't remove
-	# the cache made by _get selectively when we know a playlist has changed
-	# as we don't know exactly how the request was made/cached by _get
-
-	if ( my $cached = $cache->get($cacheKey) ) {
-		main::INFOLOG && $log->is_info && $log->info("Returning cached data for playlist $id");
-		main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($cached));
-		return $cb->($cached);
-	}
+	# we need to verify that the playlist has not been invalidated
+	my $cacheKey = 'deezer_playlist_refresh_' . $id;
+	my $refresh = $cache->get($cacheKey);
 
 	$self->_get("/playlist/$id/tracks", sub {
 		my $result = shift;
@@ -381,13 +373,12 @@ sub playlistTracks {
 				$_->{type} && $_->{type} eq 'track'
 			} @{$result->{data} || []} ]);
 
-			# with change verification, that, we can cache aggressively
-			$cache->set($cacheKey, $items, DEFAULT_TTL);
+			$cache->remove($cacheKey) if $refresh;
 		}
 
 		$cb->($items);
 	},{
-		_nocache => 1,
+		_refresh => $refresh,
 		limit => MAX_LIMIT,
 	});
 }
@@ -418,12 +409,22 @@ sub getFavorites {
 	}
 
 	my $lookupSub = sub {
-		my $scb = shift;
+		my $timestamp = shift;
+		
 		$self->_get("/user/me/$type", sub {
 			my $result = shift;
 
 			my $items = [ map { $_ } @{$result->{data} || []} ] if $result;
 			$items = Plugins::Deezer::API->cacheTrackMetadata($items) if $items && $type eq 'tracks';
+
+			# invalidate our own playlists whose update time is more recent than last lookup
+			if (defined $timestamp && $type =~/playlist/) {	
+				foreach my $playlist (@$items) {
+					next unless $self->userId == $playlist->{creator}->{id} && $playlist->{time_mod} > $timestamp;
+					main::INFOLOG && $log->is_info && $log->info("Invalidating playlist $playlist->{id}");
+					$cache->set('deezer_playlist_refresh_' . $playlist->{id}, DEFAULT_TTL);
+				}
+			}	
 
 			$cache->set($cacheKey, {
 				items => $items,
@@ -432,7 +433,7 @@ sub getFavorites {
 				total => $result->{total},
 			}, '1M') if $items;
 
-			$scb->($items);
+			$cb->($items);
 		},{
 			_nocache => 1,
 			limit => MAX_LIMIT,
@@ -456,25 +457,12 @@ sub getFavorites {
 			}
 			else {
 				main::INFOLOG && $log->is_info && $log->info("Collection of type '$type' has changed - updating");
-				return $lookupSub->($cb) unless $type =~ /playlists/;
-
-				# need to invalidate playlists that are actually updated (and correct TZ, see below)
-				my $timestamp = $cached->{timestamp} + $tzOffset;
-
-				$lookupSub->( sub {
-					my $items = shift;
-					foreach my $playlist (@$items) {
-						next unless $playlist->{time_mod} > $timestamp;
-						main::INFOLOG && $log->is_info && $log->info("Invalidating playlist $playlist->{id}");
-						$cache->remove('deezer_playlist_' . $playlist->{id});
-					}
-					$cb->($items);
-				} );
+				$lookupSub->($cached->{timestamp} + $tzOffset);
 			}
 		}, $type);
 	}
 	else {
-		$lookupSub->($cb);
+		$lookupSub->();
 	}
 }
 
@@ -539,8 +527,9 @@ sub updateFavorite {
 sub updatePlaylist {
 	my ($self, $cb, $action, $id, $trackId) = @_;
 
-	# remove that playlist from cache
-	$cache->remove('deezer_playlist_' . $id);
+	# mark that playlist as need to be refreshed. After the DEFAULT_TTL
+	# the _get will also have forgotten it, no need to go further
+	$cache->set('deezer_playlist_refresh_' . $id, DEFAULT_TTL);
 
 	my $profile  = Plugins::Deezer::API->getUserdata($self->userId);
 	my $access_token = 	$profile->{token};
@@ -803,6 +792,7 @@ sub _get {
 
 	my $ttl = delete $params->{_ttl} || DEFAULT_TTL;
 	my $noCache = delete $params->{_nocache};
+	my $refresh = delete $params->{_refresh};
 
 	my $profile  = Plugins::Deezer::API->getUserdata($self->userId);
 	$params->{access_token} = $profile->{token};
@@ -826,7 +816,7 @@ sub _get {
 	my $query = complex_to_query($params);
 	my $trace = $query =~ s/(access_token=)\w+/${1}***/r;
 
-	if (!$noCache && (my $cached = $cache->get($cacheKey))) {
+	if (!$noCache && !$refresh && (my $cached = $cache->get($cacheKey))) {
 		main::INFOLOG && $log->is_info && $log->info("Returning cached data for $url?$trace");
 		main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($cached));
 
