@@ -21,6 +21,7 @@ PLUGIN_DEEZER_REGISTER
 PLUGIN_DEEZER_AUTH_FAILED
 	DE	Anmeldung fehlgeschlagen, oder kein Premium Konto.
 	EN	Authorization failed, or no Premium account.
+	FR	Échec d'autorisation, ou compte non Premium.
 
 PLUGIN_DEEZER_ADD_ACCOUNT
 	CS	Přidat účet
@@ -285,7 +286,7 @@ PLUGIN_DEEZER_CHILL
 PLUGIN_DEEZER_MELANCHOLY
 	DE	Traurig
 	EN	Melancholy
-	FR	Melancolie
+	FR	Mélancolie
 
 PLUGIN_DEEZER_YOU_AND_ME
 	DE	Liebe
@@ -341,7 +342,7 @@ PLUGIN_DEEZER_CHANNELS
 
 PLUGIN_DEEZER_EPISODES
 	EN	Episodes
-	FR	Episodes
+	FR	Épisodes
 
 PLUGIN_DEEZER_FLOW_DEFAULT
 	EN	Regular Flow
@@ -349,4 +350,5 @@ PLUGIN_DEEZER_FLOW_DEFAULT
 
 PLUGIN_DEEZER_FLOW_DISCOVERY
 	EN	Discovery Flow
-	
+  FR  Flow découverte
+  
