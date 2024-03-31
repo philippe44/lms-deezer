@@ -60,7 +60,7 @@ sub canSeek {
 	my ($class, $client, $song) = @_;
 	my $url = $song->track()->url;
 	# can't (don't want to) seek radio/flow
-	return !(_getRadio($url) || _getFlow($url));
+	return !(_getRadio($url) || getFlow($url));
 }
 
 sub getFormatForURL {
@@ -83,7 +83,7 @@ sub canEnhanceHTTP {
 sub isRepeatingStream {
 	my ( $class, $song ) = @_;
 	my $url = $song->track()->url;
-	return _getRadio($url) || _getFlow($url);
+	return _getRadio($url) || getFlow($url);
 }
 
 sub trackGain {
@@ -307,7 +307,7 @@ sub getNextTrack {
 			return $errorCb->() unless $ids;
 			$class->getNextTrack($song, $successCb, $errorCb);
 		}, $path, 10 );
-	} elsif (my ($mode, $type) = _getFlow($url)) {
+	} elsif (my ($mode, $type) = getFlow($url)) {
 		# use tracks we have in the list (if any)
 		my $flowTracks = $song->pluginData('flowTracks') || [];
 		my $track = shift @$flowTracks;
@@ -325,7 +325,9 @@ sub getNextTrack {
 		}, $errorCb, 'flowTracks' ) if $track;
 
 		main::INFOLOG && $log->info("need to fetch more flow tracks for $mode\@$type");
-		Plugins::Deezer::Plugin::getAPIHandler($client)->flowTracks( sub {
+		my $api = Plugins::Deezer::Plugin::getAPIHandler($client);
+		
+		$api->flowTracks( sub {
 			my $tracks = shift;
 			return $errorCb->("no flow track") unless $tracks && @$tracks;
 
@@ -335,6 +337,7 @@ sub getNextTrack {
 		}, {
 			mode => $mode,
 			type => $type,
+			flow => $prefs->get($api->userId . ':flow'),
 			quality => Plugins::Deezer::API::getQuality(),
 		} );
 	} elsif (my $trackId = _getId($url)) {
@@ -497,7 +500,7 @@ sub getMetadataFor {
 	};
 
 	# when trying to get metadata for a radio/flow, we must be playing it
-	if ( _getRadio($url) || _getFlow($url) ) {
+	if ( _getRadio($url) || getFlow($url) ) {
 		$defaultMeta->{title} = cstring($client, 'PLUGIN_DEEZER_DSTM_SMART_RADIO');
 		return $defaultMeta unless $song && $song->track->url eq $url;
 
@@ -578,15 +581,15 @@ sub _getRadio{
 	return $path;
 }
 
-sub _getFlow{
-	my ($flow, $type) = $_[0] =~ /deezer:\/\/(genre|mood|default|discovery)(?:\:(.+))?\.flow$/;
+sub getFlow{
+	my ($flow, $type) = $_[0] =~ /deezer:\/\/(genre|mood|user)(?:\:(.+))?\.flow$/;
 	return $flow ? ($flow, $type || 'n/a') : ();
 }
 
 sub getPlayingId {
 	my ($client, $url) = @_;
 
-	if ( Plugins::Deezer::ProtocolHandler::_getFlow($url) ||
+	if ( Plugins::Deezer::ProtocolHandler::getFlow($url) ||
 		 Plugins::Deezer::ProtocolHandler::_getRadio($url) ) {
 		return $client->playingSong->pluginData('trackId');
 	}

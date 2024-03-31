@@ -257,6 +257,8 @@ sub handleFeed {
 			}]
 		});
 	}
+	
+	my $userId = getAPIHandler($client)->userId;
 
 	my $items = [ {
 		name => cstring($client, 'HOME'),
@@ -269,19 +271,12 @@ sub handleFeed {
 		play => 'deezer://user/me/flow.dzr',
 		type => 'outline',
 		items => [{
-			name => cstring($client, 'PLUGIN_DEEZER_FLOW_DEFAULT'),
+			name => cstring($client, 'PLUGIN_DEEZER_FLOW'),
 			image => 'plugins/Deezer/html/flow.png',
 			on_select => 'play',
 			type => 'audio',
-			url => 'deezer://default.flow',
-			play => 'deezer://default.flow',
-		},{
-			name => cstring($client, 'PLUGIN_DEEZER_FLOW_DISCOVERY'),
-			image => 'plugins/Deezer/html/flow.png',
-			on_select => 'play',
-			type => 'audio',
-			url => 'deezer://discovery.flow',
-			play => 'deezer://discovery.flow',
+			url => 'deezer://user.flow',
+			play => 'deezer://user.flow',
 		},{
 			name => cstring($client, 'GENRES'),
 			image => 'html/images/genres.png',
@@ -294,7 +289,21 @@ sub handleFeed {
 			type => 'link',
 			url => \&getFlow,
 			passthrough => [{ mode => 'moods' }],
-		}],
+		},{
+			name => cstring($client, $prefs->get($userId . ':flow') ? 'PLUGIN_DEEZER_FLOW_DISCOVERY' : 'PLUGIN_DEEZER_FLOW_DEFAULT'),
+			image => 'plugins/Deezer/html/settings.png',
+			type => 'link',
+			url => sub {
+				my ($client, $cb) = @_;
+				my $flow = !$prefs->get($userId . ':flow');
+				$prefs->set($userId . ':flow', $flow);
+				$cb->({ items => [{
+					type => 'text',
+					name => cstring($client, $flow ? 'PLUGIN_DEEZER_FLOW_DISCOVERY' : 'PLUGIN_DEEZER_FLOW_DEFAULT'),
+				}] });
+			},	
+		},
+		],
 	},{
 		name => cstring($client, 'PLAYLISTS'),
 		image => 'html/images/playlists.png',

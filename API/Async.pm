@@ -236,12 +236,15 @@ sub flowTracks {
 			_contentType => 'application/json',
 		};
 
-		my $content = { user_id => $self->userId };
+		my $content = { 
+			user_id => $self->userId,
+			tuner => $params->{flow} ? 'discovery' : 'default',
+		};
+
 		if ($params->{mode} =~ /genre|mood/ ) {
 			$content->{config_id} = ($params->{mode} eq 'genre' ?  'genre-' : '') . $params->{type};
-		} else {
-			$content->{tuner} = $params->{mode};
-		}	
+		}
+
 		$content = encode_json($content);	
 
 		$self->_ajax( sub {
@@ -553,6 +556,33 @@ sub updatePlaylist {
 		request => $request,
 		onBody  => sub { $cb->(); },
 		onError => sub { $cb->($_[1]); },
+	} );
+}
+
+sub dislike {
+	my ($self, $cb, $type, $id) = @_;
+
+	$self->_getUserContext( sub {
+		my ($tokens, $mode) = @_;
+		return $cb->() unless $tokens;
+
+		my $args = {
+			method => 'favorite_dislike.add',
+			api_token => $tokens->{csrf},
+			_contentType => 'application/json',
+			_cookies => $mode,
+		};
+
+		my $content = encode_json( {
+			ID => $id,
+			TYPE => $type eq 'track' ? 'song' : 'artist',
+			CTX => {
+				id => $self->userId,
+				t => 'dynamic_page_user_radio'
+			}
+		} );
+
+		$self->_ajax( $cb, $args, $content);
 	} );
 }
 

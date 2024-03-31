@@ -109,6 +109,23 @@ sub trackInfoMenu {
 			url => \&addPlayingToPlaylist,
 			passthrough => [ { url => $url } ],
 		} );
+		
+		if (Plugins::Deezer::ProtocolHandler::getFlow($url)) {
+			my $id = Plugins::Deezer::ProtocolHandler::getPlayingId($client, $url);
+			push @$items, ( {
+				type => 'link',
+				name => cstring($client, 'PLUGIN_DEEZER_DISLIKE_TITLE'),
+				url => \&dislikeItem,
+				image => 'plugins/Deezer/html/dislike.png',
+				passthrough => [ { type => 'track', id => $id } ],
+			},{
+				type => 'link',
+				name => cstring($client, 'PLUGIN_DEEZER_DISLIKE_ARTIST'),
+				url => \&dislikeItem,
+				image => 'plugins/Deezer/html/dislike.png',
+				passthrough => [ { type => 'artist', id => $id } ],
+			} );
+		}
 	}
 
 	return $feed;
@@ -415,6 +432,23 @@ sub addPlayingToPlaylist {
 
 	addToPlaylist($client, $cb, undef, { id => $id }),
 }
+
+#
+# dislike an artist or a track
+#
+sub dislikeItem {
+	my ($client, $cb, $args, $params) = @_;
+	
+	my $cache = Slim::Utils::Cache->new();
+	my $track = $cache->get('deezer_meta_' . $params->{id});
+	my $api = Plugins::Deezer::Plugin::getAPIHandler($client);
+	my $id = $params->{type} eq 'track' ? $params->{id} : $track->{artist}->{id};
+
+	main::INFOLOG && $log->is_info && $log->info("Disliking $params->{type}: $id");		
+	Plugins::Deezer::Plugin::getAPIHandler($client)->dislike( sub {
+		_completed($client, $cb);
+	}, $params->{type}, $id );
+}	
 
 #
 # a query that can, for JSON/Jive controllers, execute various requests like add/del a
