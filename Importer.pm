@@ -221,6 +221,7 @@ sub getArtistPicture { if (main::SCANNER) {
 
 	$id =~ s/deezer:artist://;
 
+	require Plugins::Deezer::API::Sync;
 	my $artist = Plugins::Deezer::API::Sync->getArtist(undef, $id) || {};
 
 	if ($artist->{cover}) {
