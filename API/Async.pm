@@ -20,7 +20,7 @@ use Slim::Utils::Log;
 use Slim::Utils::Prefs;
 use Slim::Utils::Strings qw(string);
 
-use Plugins::Deezer::API qw(BURL GURL UURL DEFAULT_LIMIT MAX_LIMIT DEFAULT_TTL USER_CONTENT_TTL);
+use Plugins::Deezer::API qw(BURL GURL UURL DEFAULT_LIMIT MAX_LIMIT DEFAULT_TTL DYNAMIC_TTL USER_CONTENT_TTL);
 
 # for the forgetful, API that can return tracks have a {id}/tracks endpoint that only return the
 # tracks in a 'data' array. When using {id} endpoint only, there are details about the requested
@@ -30,7 +30,10 @@ use Plugins::Deezer::API qw(BURL GURL UURL DEFAULT_LIMIT MAX_LIMIT DEFAULT_TTL U
 	__PACKAGE__->mk_accessor( rw => qw(
 		client
 		userId
-		updated
+	) );
+	
+	__PACKAGE__->mk_accessor( hash => qw(
+		updatedFavorites
 	) );
 }
 
@@ -123,6 +126,7 @@ sub search {
 
 		$cb->($items || []);
 	}, {
+		_ttl => $args->{ttl} || DYNAMIC_TTL,
 		limit => $args->{limit},
 		q => $args->{search},
 		strict => $args->{strict} || 'off',
@@ -359,7 +363,7 @@ sub playlist {
 	my ($self, $cb, $id) = @_;
 	$self->_get("/playlist/$id", sub {
 		$cb->($_[0]);
-	});
+	}, { _ttl => DYNAMIC_TTL } );
 }
 
 sub playlistTracks {
@@ -383,6 +387,7 @@ sub playlistTracks {
 
 		$cb->($items);
 	},{
+		_ttl => DYNAMIC_TTL,
 		_refresh => $refresh,
 		limit => MAX_LIMIT,
 	});
@@ -407,11 +412,10 @@ sub getFavorites {
 	my $userId = $self->userId || return $cb->();
 	my $cacheKey = "deezer_favs_$type:$userId";
 
-	# verify if that type has been updated and force refresh
-	if ((my $updated = $self->updated) =~ /$type:/) {
-		$self->updated($updated =~ s/$type://r);
-		$refresh = 1;
-	}
+	# verify if that type has been updated and force refresh (don't confuse adding
+	# a playlist to favorites with changing the *content* of a playlist)
+	$refresh ||= $self->updatedFavorites($type);
+	$self->updatedFavorites($type, 0);
 
 	my $lookupSub = sub {
 		my $timestamp = shift;
@@ -422,9 +426,10 @@ sub getFavorites {
 			my $items = [ map { $_ } @{$result->{data} || []} ] if $result;
 			$items = Plugins::Deezer::API->cacheTrackMetadata($items) if $items && $type eq 'tracks';
 
-			# invalidate our own playlists whose update time is more recent than last lookup
+			# invalidate playlists whose update time is more recent than last lookup
 			if (defined $timestamp && $type eq 'playlists') {	
 				foreach my $playlist (@$items) {
+					# we should invalidate *ALL* playlists but I'm not sure about the tz issue for public ones
 					next unless $self->userId == $playlist->{creator}->{id} && $playlist->{time_mod} > $timestamp;
 					main::INFOLOG && $log->is_info && $log->info("Invalidating playlist $playlist->{id}");
 					$cache->set('deezer_playlist_refresh_' . $playlist->{id}, DEFAULT_TTL);
@@ -505,9 +510,8 @@ sub updateFavorite {
 	my $item = $type;
 	$type .= 's';
 
-	# make sure we'll force an update check next time
-	my $updated = $self->updated;
-	$self->updated($updated . "$type:") unless $updated =~ /$type/;
+	# make favorites as updated
+	$self->updatedFavorites($type, 1);
 
 	my $query = complex_to_query( {
 		$item . '_id' => $id,

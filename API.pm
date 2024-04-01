@@ -7,7 +7,7 @@ use Slim::Utils::Cache;
 use Slim::Utils::Log;
 use Slim::Utils::Prefs;
 
-our @EXPORT_OK = qw(AURL BURL GURL UURL DEFAULT_LIMIT MAX_LIMIT DEFAULT_TTL USER_CONTENT_TTL);
+our @EXPORT_OK = qw(AURL BURL GURL UURL DEFAULT_LIMIT MAX_LIMIT DEFAULT_TTL DYNAMIC_TTL USER_CONTENT_TTL );
 
 use constant AURL => 'https://connect.deezer.com/oauth';
 use constant BURL => 'https://api.deezer.com';
@@ -19,6 +19,7 @@ use constant DEFAULT_LIMIT => 200;
 use constant MAX_LIMIT => 2000;
 
 use constant DEFAULT_TTL => 86400;
+use constant DYNAMIC_TTL => 3600;
 use constant USER_CONTENT_TTL => 300;
 
 use constant IMAGE_SIZES => {

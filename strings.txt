@@ -359,3 +359,7 @@ PLUGIN_DEEZER_DISLIKE_TITLE
 PLUGIN_DEEZER_DISLIKE_ARTIST
 	EN	Dislike this artist
 	FR	Ne pas aimer cet(te) artiste
+
+PLUGIN_DEEZER_EXPLORE
+	EN	Explore
+	FR	Explorer

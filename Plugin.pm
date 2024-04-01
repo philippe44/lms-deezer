@@ -37,7 +37,7 @@ my $prefs = preferences('plugin.deezer');
 # Similiarly, if type is 'audio' then the OPML manager does not need to call explodePlaylist
 # and if we also add an 'info' action this can be called when clicking on the item (classic)
 # or on the (M)ore icon. If there is no 'info' action, clicking on an 'audio' item displays
-# little about it, except bitrate and duration fio set in the item (only for classic)
+# little about it, except bitrate and duration if set in the item (only for classic)
 
 # Also, when type is not 'audio', we can set an 'items' action that is executed in classic
 # when clicking on item and won't make M(ore) context menu visible and it is ignored in material
@@ -59,8 +59,6 @@ my $prefs = preferences('plugin.deezer');
 
 # TODO
 # - add some notes on creating usable links on trackInfo/albuminfo/artistsinfo
-# - fix the podcast title as part of the passthrough
-# - an URL to Deezer track/album/artist location (link provided by Deezer)
 
 sub initPlugin {
 	my $class = shift;
@@ -265,7 +263,12 @@ sub handleFeed {
 		image => 'plugins/Deezer/html/home.png',
 		type => 'link',
 		url => \&Plugins::Deezer::Custom::getHome,
-	}, {
+	},{
+		name => cstring($client, 'PLUGIN_DEEZER_EXPLORE'),
+		image => 'plugins/Deezer/html/radio.png',
+		type  => 'link',
+		url => \&Plugins::Deezer::Custom::getWebItems,
+	},{
 		name => cstring($client, 'PLUGIN_DEEZER_FLOW'),
 		image => 'plugins/Deezer/html/flow.png',
 		play => 'deezer://user/me/flow.dzr',
@@ -355,11 +358,6 @@ sub handleFeed {
 		image => 'plugins/Deezer/html/rss.png',
 		type  => 'link',
 		url   => \&getPodcasts,
-	},{
-		name => cstring($client, 'RADIO'),
-		image => 'plugins/Deezer/html/radio.png',
-		type  => 'link',
-		url => \&Plugins::Deezer::Custom::getWebItems,
 	},{
 		name  => cstring($client, 'SEARCH'),
 		image => 'html/images/search.png',
@@ -769,6 +767,16 @@ sub _renderTrack {
 					id => $item->{id},
 					playlistId => $playlistId,
 				},
+			},
+		},
+		jive => {
+			nextWindow => 'nowPlaying',
+			actions => {
+				go => {
+					player => 0,
+					cmd    => [ 'deezer_browse', 'playlist', 'play' ],
+					params => { id => $item->{id} },
+				}
 			},
 		},
 	};
