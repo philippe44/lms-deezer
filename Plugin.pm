@@ -25,10 +25,16 @@ my $prefs = preferences('plugin.deezer');
 
 # Notes for the forgetful on feeds
 
-# We need a 'play' with a URL, not a CODE in items for actions to be visible. Unfortunately,
-# then LMS forces favorite's type to be 'audio' and that prevents proper explodePlayList when
-# browsing (not playing) favorite later (because 'audio' type don't need to be 'exploded'
-# except for playing. This should be fixed in https://github.com/LMS-Community/slimserver/pull/1008
+# We need a 'play' with a URL, not a CODE in items for actions to be visible. It is because
+# xmlbrowser.html only insert a M(ore) link if there is a playlink (or nothing at all).
+# Unfortunately, then LMS forces favorite's type to be 'audio' and that prevents proper 
+# explodePlayList when browsing (not playing) favorite later (because 'audio' type don't 
+# need to be 'exploded' except for playing. This is fixed in https://github.com/LMS-Community/slimserver/pull/1008
+
+# Now, if we set a 'play', then when drilling down from JSON/Jive, S::C::XMLBrowser does not 
+# expand to last level and does a play one level too high (it thinks it has a play). So we
+# need to either change xmlbrowser.html to adde M(ore) in all cases or we set manually all
+# the actions (play, add, insert and delete)
 
 # Also, don't use a URL for 'url' instead of a CODE otherwise explodePlaylist is used when
 # browsing and then the passthrough is ignored and obviously anything important there is lost
@@ -665,7 +671,8 @@ sub _renderPlaylist {
 		line2 => $item->{user}->{name},
 		favorites_url => 'deezer://playlist:' . $item->{id},
 		favorites_type => 'playlist',
-		play => 'deezer://playlist:' . $item->{id},
+		# see note above
+		# play => 'deezer://playlist:' . $item->{id},
 		type => 'playlist',
 		itemActions => {
 			info => {
@@ -675,6 +682,9 @@ sub _renderPlaylist {
 					id => $item->{id},
 				},
 			},
+			play => _makeAction('play', 'playlist', $item->{id}),
+			add => _makeAction('add', 'playlist', $item->{id}),
+			insert => _makeAction('insert', 'playlist', $item->{id}),
 		},
 		url => \&getPlaylist,
 		image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder'),
@@ -704,7 +714,8 @@ sub _renderAlbum {
 		favorites_title => $item->{title} . ' - ' . ($item->{artist}->{name} || $artist),
 		favorites_type => 'playlist',
 		favorites_url => 'deezer://album:' . $item->{id},
-		play => 'deezer://album:' . $item->{id},
+		# see note above
+		# play => 'deezer://album:' . $item->{id},
 		itemActions => {
 			info => {
 				command   => ['deezer_info', 'items'],
@@ -713,6 +724,9 @@ sub _renderAlbum {
 					id => $item->{id},
 				},
 			},
+			play => _makeAction('play', 'album', $item->{id}),
+			add => _makeAction('add', 'album', $item->{id}),
+			insert => _makeAction('insert', 'album', $item->{id}),
 		},
 		image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder'),
 		url => \&getAlbum,
@@ -769,16 +783,6 @@ sub _renderTrack {
 				},
 			},
 		},
-		jive => {
-			nextWindow => 'nowPlaying',
-			actions => {
-				go => {
-					player => 0,
-					cmd    => [ 'deezer_browse', 'playlist', 'play' ],
-					params => { id => $item->{id} },
-				}
-			},
-		},
 	};
 }
 
@@ -797,11 +801,9 @@ sub _renderPodcast {
 		name => $item->{title},
 		line1 => $item->{title},
 		line2 => $item->{description},
-		# see comment on _renderAlbum and the issue about title that will
-		# be missing as we'll use explodePlaylist. But if play is CODE, then
-		# actions are ignored.
 		favorites_url => 'deezer://podcast:' . $item->{id},
-		play => 'deezer://podcast:' . $item->{id},
+		# see note above
+		# play => 'deezer://podcast:' . $item->{id},
 		type => 'playlist',
 		itemActions => {
 			info => {
@@ -811,6 +813,9 @@ sub _renderPodcast {
 					id => $item->{id},
 				},
 			},
+			play => _makeAction('play', 'podcast', $item->{id}),
+			add => _makeAction('add', 'podcast', $item->{id}),
+			insert => _makeAction('insert', 'podcast', $item->{id}),
 		},
 		url => \&getPodcastEpisodes,
 		image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder'),
@@ -999,6 +1004,17 @@ sub _renderGenrePodcast {
 			id => $item->{id},
 			type => 'podcasts',
 		} ],
+	};
+}
+
+sub _makeAction {
+	my ($action, $type, $id) = @_;
+	return {
+		command => ['deezer_browse', 'playlist', $action],
+		fixedParams => {
+			type => $type, 
+			id => $id,
+		},
 	};
 }
 

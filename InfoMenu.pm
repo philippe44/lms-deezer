@@ -109,8 +109,8 @@ sub trackInfoMenu {
 			url => \&addPlayingToPlaylist,
 			passthrough => [ { url => $url } ],
 		} );
-		
-		if (Plugins::Deezer::ProtocolHandler::getFlow($url)) {
+
+		if (Plugins::Deezer::ProtocolHandler::getFlow($url) || $url eq 'deezer://user/me/flow.dzr') {
 			my $id = Plugins::Deezer::ProtocolHandler::getPlayingId($client, $url);
 			push @$items, ( {
 				type => 'link',
@@ -243,7 +243,6 @@ sub menuInfoWeb {
 
 	$request->addParam('_index', 0);
 	$request->addParam('_quantity', 10);
-#$log->error("InfoWeb ", Data::Dump::dump($request));
 
 	# we can't get the response live, we must be called back by cliQuery to
 	# call it back ourselves
