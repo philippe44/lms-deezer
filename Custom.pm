@@ -141,7 +141,7 @@ sub getWebItems {
 		} ];
 
 		foreach my $module (@$modules) {
-			push @$items, _renderModule($module) if $module->{target} =~ /channels|podcasts/;
+			push @$items, _renderModule($client, $module) if $module->{target} =~ /channels|podcasts/;
 		}
 
 		$cb->( { items => $items || []} );
@@ -212,7 +212,7 @@ sub getItems {
 
 			my $items = scalar @$sections == 1 ?
 						_renderItems($client, $sections->[0]->{items}) :
-						[ map { _renderModule($_) } @$sections ];
+						[ map { _renderModule($client, $_) } @$sections ];
 
 			$cb->( { items => $items || []} );
 		}, $params->{target} );
@@ -220,10 +220,18 @@ sub getItems {
 }
 
 sub _renderModule {
-	my ($entry) = @_;
+	my ($client, $entry) = @_;
 
 	my $passthrough = { target => $entry->{target} };
 	$passthrough->{items} = $entry->{items} unless $entry->{hasMoreItems};
+
+	# make single livestream entry directly accessible
+	if ( @{$passthrough->{items} || []} == 1 && $passthrough->{items}->[0]->{type} eq 'livestream' ) {
+		my $item = _renderItem($client, $passthrough->{items}->[0]);
+		$item->{favorites_icon} = delete $item->{image};
+		$item->{name} = $entry->{title};
+		return $item;
+	}
 
 	return {
 		title => $entry->{title},
