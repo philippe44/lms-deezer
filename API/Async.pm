@@ -626,8 +626,6 @@ sub dislike {
 
 sub listened {
 	my ($self, $id) = @_;
-	use feature 'state';
-	state $previous;
 
 	$self->_getUserContext( sub {
 		my ($tokens, $mode) = @_;
@@ -651,11 +649,7 @@ sub listened {
 			},
 		} );
 
-		$previous = $id;
-
-		$self->_ajax( sub {
-			$log->error(Data::Dump::dump(shift));
-		}, $args, $content);
+		$self->_ajax( sub {	}, $args, $content);
 	} );
 
 }
