@@ -718,20 +718,20 @@ sub _menuTrackInfo {
 	}
 
 	push @$items, ( {
-		type => 'link',
+		type => $id > 0 ? 'link' : 'text',
 		name =>  $track->{album}->{title},
 		label => 'ALBUM',
-		itemActions => {
+		itemActions => $id < 0 ? undef : {
 			items => {
 				command     => ['deezer_browse', 'items'],
 				fixedParams => { type => 'album', id => $track->{album}->{id} },
 			},
 		},
 	}, {
-		type => 'link',
+		type => $id > 0 ? 'link' : 'text',
 		name =>  $track->{artist}->{name},
 		label => 'ARTIST',
-		itemActions => {
+		itemActions => $id < 0 ? undef : {
 			items => {
 				command     => ['deezer_browse', 'items'],
 				fixedParams => { type => 'artist', id => $track->{artist}->{id} },

@@ -572,7 +572,7 @@ sub getIcon {
 }
 
 sub _getId {
-	my ($id) = $_[0] =~ m|deezer://(\d+)|;
+	my ($id) = $_[0] =~ m|deezer://(-?\d+)|;
 	return $id;
 }
 

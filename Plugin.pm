@@ -314,36 +314,47 @@ sub handleFeed {
 		},
 		],
 	},{
-		name => cstring($client, 'PLAYLISTS'),
-		image => 'html/images/playlists.png',
-		type => 'link',
-		url => \&getFavorites,
-		passthrough => [{ type => 'playlists' }],
-	},{
-		name => cstring($client, 'ALBUMS'),
-		image => 'html/images/albums.png',
-		type => 'link',
-		url => \&getFavorites,
-		passthrough => [{ type => 'albums' }],
-	},{
-		name => cstring($client, 'SONGS'),
-		image => 'html/images/playall.png',
-		type => 'link',
-		url => \&getFavorites,
-		passthrough => [{ type => 'tracks' }],
-	},{
-		name => cstring($client, 'ARTISTS'),
-		image => 'html/images/artists.png',
-		type => 'link',
-		url => \&getFavorites,
-		passthrough => [{ type => 'artists' }],
-	# },{
-		# name => cstring($client, 'PODCASTS'),
-		# image => 'plugins/Deezer/html/podcast.png',
-		# type => 'link',
-		# url => \&getFavorites,
-		# passthrough => [{ type => 'podcasts' }],
-	},{
+		name  => cstring($client, 'PLUGIN_DEEZER_COLLECTION'),
+		image => 'html/images/musicfolder.png',
+		type => 'outline',
+		unfold => 1,
+		items => [ {
+			name => cstring($client, 'PLAYLISTS'),
+			image => 'html/images/playlists.png',
+			type => 'link',
+			url => \&getFavorites,
+			passthrough => [{ type => 'playlists' }],
+		},{
+			name => cstring($client, 'ALBUMS'),
+			image => 'html/images/albums.png',
+			type => 'link',
+			url => \&getFavorites,
+			passthrough => [{ type => 'albums' }],
+		},{
+			name => cstring($client, 'SONGS'),
+			image => 'html/images/playall.png',
+			type => 'link',
+			url => \&getFavorites,
+			passthrough => [{ type => 'tracks' }],
+		},{
+			name => cstring($client, 'ARTISTS'),
+			image => 'html/images/artists.png',
+			type => 'link',
+			url => \&getFavorites,
+			passthrough => [{ type => 'artists' }],
+		# },{
+			# name => cstring($client, 'PODCASTS'),
+			# image => 'plugins/Deezer/html/podcast.png',
+			# type => 'link',
+			# url => \&getFavorites,
+			# passthrough => [{ type => 'podcasts' }],
+		},{
+			name => cstring($client, 'PLUGIN_DEEZER_PERSONAL'),
+			image => 'plugins/Deezer/html/personal.png',
+			type  => 'link',
+			url   => \&getPersonal,
+		} ]		
+	}, {
 		name => cstring($client, 'GENRES'),
 		image => 'html/images/genres.png',
 		type => 'link',
@@ -404,6 +415,11 @@ sub handleFeed {
 			url   => \&search,
 			passthrough => [{ type => 'podcast' }],
 		} ],
+	}, {
+		name => cstring($client, 'PLUGIN_DEEZER_HISTORY'),
+		image => 'plugins/Deezer/html/history.png',
+		type  => 'link',
+		url   => \&getHistory,
 	} ];
 
 	if ($client && keys %{$prefs->get('accounts') || {}} > 1) {
@@ -534,6 +550,26 @@ sub getRadios {
 
 	getAPIHandler($client)->radios(sub {
 		my $items = [ map { renderItem($client, $_) } @{$_[0]} ];
+
+		$callback->( { items => $items } );
+	});
+}
+
+sub getHistory {
+	my ( $client, $callback ) = @_;
+
+	getAPIHandler($client)->history(sub {
+		my $items = _renderTracks( $_[0], { addArtistToTitle => 1 } );
+
+		$callback->( { items => $items } );
+	});
+}
+
+sub getPersonal {
+	my ( $client, $callback ) = @_;
+
+	getAPIHandler($client)->personal(sub {
+		my $items = _renderTracks( $_[0], { addArtistToTitle => 1 } );
 
 		$callback->( { items => $items } );
 	});

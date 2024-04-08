@@ -20,7 +20,7 @@ use Slim::Utils::Log;
 use Slim::Utils::Prefs;
 use Slim::Utils::Strings qw(string);
 
-use Plugins::Deezer::API qw(BURL GURL UURL DEFAULT_LIMIT MAX_LIMIT DEFAULT_TTL DYNAMIC_TTL USER_CONTENT_TTL);
+use Plugins::Deezer::API qw(BURL GURL UURL DEFAULT_LIMIT MAX_LIMIT DEFAULT_TTL PODCAST_TTL DYNAMIC_TTL USER_CONTENT_TTL);
 
 # for the forgetful, API that can return tracks have a {id}/tracks endpoint that only return the
 # tracks in a 'data' array. When using {id} endpoint only, there are details about the requested
@@ -43,6 +43,8 @@ my $prefs = preferences('plugin.deezer');
 
 my %apiClients;
 my $tzOffset = tz_local_offset();
+
+use constant PAGE_SIZE => 50;
 
 sub init {
 	my $accounts = $prefs->get("accounts");
@@ -335,7 +337,10 @@ sub podcastEpisodes {
 		$episodes = Plugins::Deezer::API->cacheEpisodeMetadata($episodes->{data}, { podcast => $podcast } ) if $episodes;
 
 		$cb->($episodes || []);
-	}, { _ttl => USER_CONTENT_TTL } );
+	}, { 
+		_ttl => PODCAST_TTL,
+		limit => MAX_LIMIT,
+	} );
 }
 
 sub radios {
@@ -343,6 +348,35 @@ sub radios {
 	$self->_get('/radio', sub {
 		$cb->($_[0]->{data} || []);
 	});
+}
+
+sub history {
+	my ($self, $cb) = @_;
+	$self->_get('/user/me/history', sub {
+		my $history = $_[0]->{data};
+
+		my $tracks = [ grep { $_->{type} eq 'track' } @$history ] if $history;
+		$tracks = Plugins::Deezer::API->cacheTrackMetadata($tracks);
+
+		$cb->($tracks || []);
+	}, { 
+		_ttl => USER_CONTENT_TTL,
+		limit => MAX_LIMIT,
+	} );
+}
+
+sub personal {
+	my ($self, $cb) = @_;
+	$self->_get('/user/me/personal_songs', sub {
+		my $personal = shift;
+
+		my $tracks = Plugins::Deezer::API->cacheTrackMetadata( $personal->{data} || [] ) if $personal;
+
+		$cb->($tracks || []);
+	}, { 
+		_ttl => USER_CONTENT_TTL,
+		limit => MAX_LIMIT,
+	} );
 }
 
 sub genres {
@@ -658,6 +692,9 @@ sub _getProviders {
 	my $formats = [ {
 		cipher => 'BF_CBC_STRIPE',
 		format => 'MP3_128',
+	}, {
+		cipher => 'BF_CBC_STRIPE',
+		format => 'MP3_MISC',
 	} ];
 
 	unshift @$formats, {
@@ -829,6 +866,7 @@ sub _get {
 	my $ttl = delete $params->{_ttl} || DEFAULT_TTL;
 	my $noCache = delete $params->{_nocache};
 	my $refresh = delete $params->{_refresh};
+	my $pageSize = delete $params->{_page} || PAGE_SIZE;
 
 	my $profile  = Plugins::Deezer::API->getUserdata($self->userId);
 	$params->{access_token} = $profile->{token};
@@ -844,9 +882,9 @@ sub _get {
 	main::INFOLOG && $log->is_info && $log->info("Using cache key '$trace'") unless $noCache;
 
 	my $maxLimit = 0;
-	if ($params->{limit} > DEFAULT_LIMIT) {
+	if ($params->{limit} > $pageSize) {
 		$maxLimit = $params->{limit};
-		$params->{limit} = DEFAULT_LIMIT;
+		$params->{limit} = $pageSize;
 	}
 
 	my $query = complex_to_query($params);
@@ -872,20 +910,20 @@ sub _get {
 
 			# note that when querying compound types like 'chart', there is no 'total' as the result is
 			# a hash with keys for tracks, artists, albums and podcasts *and* the {data] key is a sub-key
-			# of theser. This means that _get only works because of lack of total so we do not do the amap
+			# of these. This means that _get only works because of lack of total so we do not do the amap
 			# request which otherwise would try to take {data} key and push it into results. This also means
 			# that for compound, we get what we get, no paging (seems that it's limited to 100 anyway
 
-			if ($maxLimit && ref $result eq 'HASH' && $maxLimit > $result->{total} && $result->{total} - DEFAULT_LIMIT > 0) {
-				my $remaining = $result->{total} - DEFAULT_LIMIT;
+			if ($maxLimit && ref $result eq 'HASH' && $maxLimit > $result->{total} && $result->{total} - $pageSize > 0) {
+				my $remaining = $result->{total} - $pageSize;
 				main::INFOLOG && $log->is_info && $log->info("We need to page to get $remaining more results (total: $result->{total})");
 
 				my @offsets;
-				my $offset = DEFAULT_LIMIT;
+				my $offset = $pageSize;
 				my $maxOffset = min($maxLimit, MAX_LIMIT, $result->{total});
 				do {
 					push @offsets, $offset;
-					$offset += DEFAULT_LIMIT;
+					$offset += $pageSize;
 				} while ($offset < $maxOffset);
 
 				if (scalar @offsets) {
@@ -893,9 +931,13 @@ sub _get {
 						inputs => \@offsets,
 						action => sub {
 							my ($input, $acb) = @_;
-							$self->_get($url, $acb, {
+							$self->_get($url, sub {
+								# only return the first argument, the second would be considered an error
+								$acb->($_[0]);
+							}, {
 								%$params,
 								index => $input,
+								_nocache => 1,
 							});
 						},
 						at_a_time => 4,

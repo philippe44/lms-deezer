@@ -86,7 +86,7 @@ sub beforeRender {
 						Slim::Utils::Network::serverAddr() . ':' .
 						preferences('server')->get('httpport') .
 						"&seed=$seed",
-		perms => 'basic_access,offline_access,email,manage_library,delete_library',
+		perms => 'basic_access,offline_access,email,manage_library,delete_library,listening_history',
 	} );
 
 	$params->{seed} = $seed++;

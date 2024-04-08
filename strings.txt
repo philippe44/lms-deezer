@@ -363,3 +363,15 @@ PLUGIN_DEEZER_DISLIKE_ARTIST
 PLUGIN_DEEZER_EXPLORE
 	EN	Explore
 	FR	Explorer
+
+PLUGIN_DEEZER_HISTORY
+	EN	Listening History
+	FR	Historique d'écoute
+
+PLUGIN_DEEZER_PERSONAL
+	EN	Personal library
+	FR	Bibliothèque personelle
+
+PLUGIN_DEEZER_COLLECTION
+	EN	My collection
+	FR	Ma collection
