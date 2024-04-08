@@ -200,7 +200,7 @@ PLUGIN_DEEZER_RELATED
 
 PLUGIN_DEEZER_SMART_RADIO
 	EN	Smart Radio
-	NL	Radio Intelligente
+	FR	Radio Intelligente
 
 PLUGIN_DEEZER_FLOW
 	EN	Flow
@@ -324,62 +324,76 @@ PLUGIN_DEEZER_ADD_TO_PLAYLIST
 	FR	Ajouter à une liste de lecture Deezer
 
 PLUGIN_DEEZER_REMOVE_FROM_PLAYLIST
+	DE	Aus dieser Wiedergabeliste entfernen
 	EN	Remove from this playlist
 	FR	Supprimer de cette liste de lecture
-	DE	Aus diese Wiedergabeliste entfernen
 
 PLUGIN_DEEZER_LIVE_PARAMS
+	DE	Livestreaming Einstellungen
 	EN	Live streaming parameters
 	FR	Paramètres streaming en direct
 
 PLUGIN_DEEZER_LIVE_PARAMS_DESC
+	DE	Definieren Sie die minimale Bitrate und das Datenformat für Livestreaming. Die am besten passende Qulaität wird ausgewählt
 	EN	Specify minimum bitrate and desired format for live streaming. Closest available will be selected
 	FR	Spécifie le débit minimum et le format désiré pour le streaming en direct. Le plus proche sera sélectionné
 
 PLUGIN_DEEZER_CHANNELS
+	DE	Kanäle
 	EN	Channels
 	FR	Canaux
 
 PLUGIN_DEEZER_EPISODES
+	DE	Episoden
 	EN	Episodes
 	FR	Épisodes
 
 PLUGIN_DEEZER_FLOW_DEFAULT
+	DE	Favoriten Flow
 	EN	Favorites Flow mode
 	FR	Mode Flow favoris
 
 PLUGIN_DEEZER_FLOW_DISCOVERY
+	DE	Entdeckungs Flow
 	EN	Discovery Flow mode
 	FR	Mode Flow découverte
-	
+
 PLUGIN_DEEZER_DISLIKE_TITLE
+	DE	Titel entlieben
 	EN	Dislike this title
 	FR	Ne pas aimer cette chanson
-	
+
 PLUGIN_DEEZER_DISLIKE_ARTIST
+	DE	Interpret entlieben
 	EN	Dislike this artist
 	FR	Ne pas aimer cet(te) artiste
 
 PLUGIN_DEEZER_EXPLORE
+	DE	Erkunden
 	EN	Explore
 	FR	Explorer
 
 PLUGIN_DEEZER_HISTORY
+	DE	Hörverlauf
 	EN	Listening History
 	FR	Historique d'écoute
 
 PLUGIN_DEEZER_PERSONAL
+	DE	Persönliche Sammlung
 	EN	Personal library
 	FR	Bibliothèque personelle
 
 PLUGIN_DEEZER_COLLECTION
+	DE	Meine Sammlung
 	EN	My collection
 	FR	Ma collection
 
 PLUGIN_DEEZER_UNFOLD
+	DE	Sammlungsmenu aufklappen
 	EN	Unfold collection menu
 	FR	Dérouler le menu collection
 
 PLUGIN_DEEZER_UNFOLD_DESC
+	DE	Definieren Sie, wie Sie die Sammlung darstellen wollen
 	EN	Set the folding mode of your collection's menu
 	FR	Configure le déroulement du menu de votre collection
