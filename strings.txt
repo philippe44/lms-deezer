@@ -375,3 +375,11 @@ PLUGIN_DEEZER_PERSONAL
 PLUGIN_DEEZER_COLLECTION
 	EN	My collection
 	FR	Ma collection
+
+PLUGIN_DEEZER_UNFOLD
+	EN	Unfold collection menu
+	FR	Dérouler le menu collection
+
+PLUGIN_DEEZER_UNFOLD_DESC
+	EN	Set the folding mode of your collection's menu
+	FR	Configure le déroulement du menu de votre collection

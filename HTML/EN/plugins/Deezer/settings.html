@@ -42,6 +42,10 @@
 		<input name="addAccount" type="submit" onclick="oauthLaunch('[% authLink %]')" value="[% "PLUGIN_DEEZER_ADD_ACCOUNT" | string %]" class="stdclick" />
 	[% END %]
 
+	[% WRAPPER setting title="PLUGIN_DEEZER_UNFOLD" desc="PLUGIN_DEEZER_UNFOLD_DESC" %]
+		<input name="pref_unfold_collection" type="checkbox" [% IF prefs.pref_unfold_collection %] checked [% END %]>
+	[% END %]
+
 	[% WRAPPER setting title="PLUGIN_DEEZER_QUALITY" desc="PLUGIN_DEEZER_QUALITY_DESC" %]
 		<!-- <input list="rates" name="pref_quality" id="quality"> -->
 		<!-- <datalist id="rates"> -->

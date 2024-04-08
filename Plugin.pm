@@ -74,6 +74,7 @@ sub initPlugin {
 		liveformat => 'mp3',
 		quality => 'HIGH',
 		serial => '29436f4b2c5b2b552e4c221b2d7c7a4e7a336c002d7278512e486f1f2c677d432b1c224e29522c0b280e7f42750f7b43794a271c7d652b06744c5454795f6c4e781f51197d742e077b5b344e7b0e694d7e4c271e2c1c7c032c4f794e786060062b4260432f306b40',
+		unfold_collection => 1,
 	});
 
 	Plugins::Deezer::API::Auth->init();
@@ -317,7 +318,7 @@ sub handleFeed {
 		name  => cstring($client, 'PLUGIN_DEEZER_COLLECTION'),
 		image => 'html/images/musicfolder.png',
 		type => 'outline',
-		unfold => 1,
+		unfold => $prefs->get('unfold_collection'),
 		items => [ {
 			name => cstring($client, 'PLAYLISTS'),
 			image => 'html/images/playlists.png',
