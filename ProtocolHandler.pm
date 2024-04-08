@@ -414,6 +414,7 @@ sub _setTrackParams {
 	$song->pluginData(trackId => $track->{id});
 
 	$successCb->($format, $bitrate * 1000);
+	Plugins::Deezer::Plugin::getAPIHandler($client)->listened($track->{id});
 
 	main::DEBUGLOG && $log->is_debug && $log->debug("Getting next track playback info for ", $song->track->url);
 }

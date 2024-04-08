@@ -31,7 +31,7 @@ use Plugins::Deezer::API qw(BURL GURL UURL DEFAULT_LIMIT MAX_LIMIT DEFAULT_TTL P
 		client
 		userId
 	) );
-	
+
 	__PACKAGE__->mk_accessor( hash => qw(
 		updatedFavorites
 	) );
@@ -242,7 +242,7 @@ sub flowTracks {
 			_contentType => 'application/json',
 		};
 
-		my $content = { 
+		my $content = {
 			user_id => $self->userId,
 			tuner => $params->{flow} ? 'discovery' : 'default',
 		};
@@ -251,7 +251,7 @@ sub flowTracks {
 			$content->{config_id} = ($params->{mode} eq 'genre' ?  'genre-' : '') . $params->{type};
 		}
 
-		$content = encode_json($content);	
+		$content = encode_json($content);
 
 		$self->_ajax( sub {
 			my $result = shift;
@@ -337,7 +337,7 @@ sub podcastEpisodes {
 		$episodes = Plugins::Deezer::API->cacheEpisodeMetadata($episodes->{data}, { podcast => $podcast } ) if $episodes;
 
 		$cb->($episodes || []);
-	}, { 
+	}, {
 		_ttl => PODCAST_TTL,
 		limit => MAX_LIMIT,
 	} );
@@ -359,7 +359,7 @@ sub history {
 		$tracks = Plugins::Deezer::API->cacheTrackMetadata($tracks);
 
 		$cb->($tracks || []);
-	}, { 
+	}, {
 		_ttl => USER_CONTENT_TTL,
 		limit => MAX_LIMIT,
 	} );
@@ -373,7 +373,7 @@ sub personal {
 		my $tracks = Plugins::Deezer::API->cacheTrackMetadata( $personal->{data} || [] ) if $personal;
 
 		$cb->($tracks || []);
-	}, { 
+	}, {
 		_ttl => USER_CONTENT_TTL,
 		limit => MAX_LIMIT,
 	} );
@@ -453,7 +453,7 @@ sub getFavorites {
 
 	my $lookupSub = sub {
 		my $timestamp = shift;
-		
+
 		$self->_get("/user/me/$type", sub {
 			my $result = shift;
 
@@ -461,14 +461,14 @@ sub getFavorites {
 			$items = Plugins::Deezer::API->cacheTrackMetadata($items) if $items && $type eq 'tracks';
 
 			# invalidate playlists whose update time is more recent than last lookup
-			if (defined $timestamp && $type eq 'playlists') {	
+			if (defined $timestamp && $type eq 'playlists') {
 				foreach my $playlist (@$items) {
 					# we should invalidate *ALL* playlists but I'm not sure about the tz issue for public ones
 					next unless $self->userId == $playlist->{creator}->{id} && $playlist->{time_mod} > $timestamp;
 					main::INFOLOG && $log->is_info && $log->info("Invalidating playlist $playlist->{id}");
 					$cache->set('deezer_playlist_refresh_' . $playlist->{id}, DEFAULT_TTL);
 				}
-			}	
+			}
 
 			$cache->set($cacheKey, {
 				items => $items,
@@ -576,7 +576,7 @@ sub updatePlaylist {
 
 	my $profile  = Plugins::Deezer::API->getUserdata($self->userId);
 	my $access_token = 	$profile->{token};
-	
+
 	my $query = complex_to_query( {
 		songs => $trackId,
 		access_token => $access_token,
@@ -622,6 +622,42 @@ sub dislike {
 
 		$self->_ajax( $cb, $args, $content);
 	} );
+}
+
+sub listened {
+	my ($self, $id) = @_;
+	use feature 'state';
+	state $previous;
+
+	$self->_getUserContext( sub {
+		my ($tokens, $mode) = @_;
+		return unless $tokens;
+
+		my $args = {
+			method => 'log.listen',
+			api_token => $tokens->{csrf},
+			_contentType => 'application/json',
+			_cookies => $mode,
+		};
+
+		my $content = encode_json( {
+			params => {
+				media => {
+					id => $id,
+					type => 'song',
+				},
+				ts_listen => time(),
+				type => 0,
+			},
+		} );
+
+		$previous = $id;
+
+		$self->_ajax( sub {
+			$log->error(Data::Dump::dump(shift));
+		}, $args, $content);
+	} );
+
 }
 
 sub getTrackUrl {
