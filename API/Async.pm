@@ -413,7 +413,7 @@ sub playlistTracks {
 
 		if ($result) {
 			$items = Plugins::Deezer::API->cacheTrackMetadata([ grep {
-				$_->{type} && $_->{type} eq 'track'
+				$_->{type} && $_->{type} eq 'track' && $_->{readable}
 			} @{$result->{data} || []} ]);
 
 			$cache->remove($cacheKey) if $refresh;
