@@ -267,7 +267,22 @@ sub _renderItem {
 			url => "deezerlive://$entry->{id}",
 			image => $image,
 		};
+		
+	} elsif ( $entry->{__TYPE__} eq 'livestream' ) {
 
+		my $image = Plugins::Deezer::API->getImageUrl( {
+						md5_image => $entry->{LIVESTREAM_IMAGE_MD5},
+		}, 'usePlaceholder', 'live');
+		$cache->set("deezer_live_image_$entry->{LIVESTREAM_ID}", $image, '30 days');
+
+		return {
+			name => $entry->{LIVESTREAM_TITLE},
+			favorites_title => $entry->{LIVESTREAM_TITLE} . ' - ' . cstring($client, 'PLUGIN_DEEZER_ON_DEEZER'),
+			type => 'audio',
+			url => "deezerlive://$entry->{LIVESTREAM_ID}",
+			image => $image,
+		};
+		
 	} elsif ( $entry->{type} eq 'show' ) {
 
 		# fabricate an expected podcast entry to fit existing model
