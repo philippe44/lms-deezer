@@ -615,9 +615,9 @@ sub _menuBase {
 	my $items = [];
 
 	push @$items, (
+		_menuPlay($client, $type, $id, $params->{menu}),	
+		_menuAdd($client, $type, $id, 'insert', 'PLAY_NEXT', $params->{menu}),		
 		_menuAdd($client, $type, $id, 'add', 'ADD_TO_END', $params->{menu}),
-		_menuAdd($client, $type, $id, 'insert', 'PLAY_NEXT', $params->{menu}),
-		_menuPlay($client, $type, $id, $params->{menu}),
 	) if $params->{useContextMenu} || $params->{feedMode};
 
 	return $items;
