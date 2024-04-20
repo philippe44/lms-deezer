@@ -289,18 +289,21 @@ sub album {
 }
 
 sub albumTracks {
-	my ($self, $cb, $id, $title) = @_;
+	my ($self, $cb, $id) = @_;
 
 	# don't ask directly for tracks or album data will be missing
-	#$self->_get("/album/$id/tracks", sub {
-	$self->_get("/album/$id", sub {
+	$self->album(sub {
 		my $album = shift;
-		my $tracks = $album->{tracks}->{data} if $album;
-		# only missing data in album/tracks is the album itself...
-		$tracks = Plugins::Deezer::API->cacheTrackMetadata( $tracks ) if $tracks;
+		
+		$self->_get("/album/$id/tracks", sub {
+			my $tracks = shift;
+			my $tracks = $tracks->{data} if $tracks;
+			# only missing data in album/tracks is the album itself...
+			$tracks = Plugins::Deezer::API->cacheTrackMetadata( $tracks, { album => $album } ) if $tracks;
 
-		$cb->($tracks || []);
-	});
+			$cb->($tracks || []);
+		} );
+	}, $id )	;
 }
 
 sub podcasts {

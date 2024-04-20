@@ -137,7 +137,7 @@ sub cacheTrackMetadata {
 			id => $entry->{id},
 			title => $entry->{title},
 			artist => $entry->{artist},
-			album => $entry->{album},
+			album => $entry->{album} || $params->{album},
 			duration => $entry->{duration},
 			icon => $icon,
 			cover => $icon,

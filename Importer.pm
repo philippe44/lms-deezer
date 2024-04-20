@@ -87,7 +87,7 @@ sub scanAlbums { if (main::SCANNER) {
 
 			# we already have tracks through favorites but they are incomplete and don't include contributors
 			$album->{contributors} = Plugins::Deezer::API::Sync->album($userId, $albumId)->{contributors};
-			$album->{tracks} = Plugins::Deezer::API::Sync->albumTracks($userId, $albumId, $album->{title});
+			$album->{tracks} = Plugins::Deezer::API::Sync->albumTracks($userId, $albumId, $album);
 
 			if (!$album->{tracks}) {
 				$log->warn("Didn't receive tracks for $album->{title}/$album->{id}");

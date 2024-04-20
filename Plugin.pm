@@ -767,7 +767,7 @@ sub _renderAlbum {
 		},
 		image => Plugins::Deezer::API->getImageUrl($item, 'usePlaceholder'),
 		url => \&getAlbum,
-		passthrough => [{ id => $item->{id}	}],
+		passthrough => [ { id => $item->{id} } ],
 	};
 }
 
