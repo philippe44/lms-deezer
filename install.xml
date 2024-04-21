@@ -4,7 +4,7 @@
   <description>PLUGIN_DEEZER_DESC</description>
   <creator>philippe_44, Michael Herger</creator>
   <id>16da8158-263f-4347-8125-184372ea5611</id>
-  <version>2.81.1</version>
+  <version>2.81.2</version>
   <module>Plugins::Deezer::Plugin</module>
   <importmodule>Plugins::Deezer::Importer</importmodule>
   <optionsURL>plugins/Deezer/settings.html</optionsURL>
