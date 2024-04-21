@@ -77,6 +77,12 @@ sub initPlugin {
 		unfold_collection => 1,
 	});
 
+	# reset the API ref when a player changes user
+	$prefs->setChange( sub {
+		my ($pref, $userId, $client) = @_;
+		$client->pluginData(api => 0);
+	}, 'userId');
+
 	Plugins::Deezer::API::Auth->init();
 	Plugins::Deezer::ProtocolHandler->init();
 	Plugins::Deezer::API::Async->init();
@@ -445,8 +451,6 @@ sub selectAccount {
 			name => $name,
 			url => sub {
 				my ($client, $cb2, $params, $args) = @_;
-
-				$client->pluginData(api => 0);
 				$prefs->client($client)->set('userId', $args->{id});
 
 				$cb2->({ items => [{
