@@ -297,11 +297,13 @@ sub albumTracks {
 		
 		$self->_get("/album/$id/tracks", sub {
 			my $tracks = shift;
-			my $tracks = $tracks->{data} if $tracks;
+			$tracks = $tracks->{data} if $tracks;
 			# only missing data in album/tracks is the album itself...
 			$tracks = Plugins::Deezer::API->cacheTrackMetadata( $tracks, { album => $album } ) if $tracks;
 
 			$cb->($tracks || []);
+		}, {
+			limit => MAX_LIMIT,
 		} );
 	}, $id )	;
 }
