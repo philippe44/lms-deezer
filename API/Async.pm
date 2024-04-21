@@ -355,7 +355,7 @@ sub radios {
 
 sub history {
 	my ($self, $cb) = @_;
-	$self->_get('/user/me/history', sub {
+	$self->_get('/user/' . $self->userId . '/history', sub {
 		my $history = $_[0]->{data};
 
 		my $tracks = [ grep { $_->{type} eq 'track' } @$history ] if $history;
@@ -370,7 +370,7 @@ sub history {
 
 sub personal {
 	my ($self, $cb) = @_;
-	$self->_get('/user/me/personal_songs', sub {
+	$self->_get('/user/' . $self->userId . '/personal_songs', sub {
 		my $personal = shift;
 
 		my $tracks = Plugins::Deezer::API->cacheTrackMetadata( $personal->{data} || [] ) if $personal;
@@ -457,6 +457,7 @@ sub getFavorites {
 	my $lookupSub = sub {
 		my $timestamp = shift;
 
+		# no cache, so we can use /me
 		$self->_get("/user/me/$type", sub {
 			my $result = shift;
 
@@ -519,6 +520,7 @@ sub getCollectionFingerprint {
 	my $userId = $self->userId || return $cb->();
 	my $sort = $type eq 'playlists' ? 'time_mod' : 'time_add';
 
+	# no cache, so we can use /me
 	$self->_get("/user/me/$type", sub {
 		my $result = shift;
 

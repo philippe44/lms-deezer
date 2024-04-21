@@ -53,7 +53,6 @@ sub getHome {
 sub getHomeSection {
 	my ( $client, $cb, $args, $params ) = @_;
 
-	my $api = Plugins::Deezer::Plugin::getAPIHandler($client);
 	my $items = [];
 
 	foreach my $entry (@{$params->{entries}}) {
