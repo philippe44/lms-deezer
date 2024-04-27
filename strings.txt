@@ -381,7 +381,7 @@ PLUGIN_DEEZER_HISTORY
 PLUGIN_DEEZER_PERSONAL
 	DE	Persönliche Sammlung
 	EN	Personal library
-	FR	Bibliothèque personelle
+	FR	Bibliothèque personnelle
 
 PLUGIN_DEEZER_COLLECTION
 	DE	Meine Sammlung
