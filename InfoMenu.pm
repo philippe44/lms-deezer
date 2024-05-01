@@ -232,7 +232,7 @@ sub browseArtistMenu {
 }
 
 #
-# called when clicking 'M' icon on artist/album/tracl/podcast/episode list of items in a feed
+# called when clicking 'M' icon on artist/album/track/podcast/episode list of items in a feed
 #
 sub menuInfoWeb {
 	my $request = shift;
@@ -534,10 +534,11 @@ sub menuBrowse {
 	# if we are re-drilling, no need to search, just get our anchor/root
 	if ( defined $itemId ) {
 		my ($key) = $itemId =~ /([^\.]+)/;
-
 		my $cached = ${$rootFeeds{$key}};
+
+		main::INFOLOG && $log->is_info && $log->info("re-drilling using cache key: $key");
 		Slim::Control::XMLBrowser::cliQuery('deezer_browse', $cached, $request);
-		
+
 		return;
 	}
 
@@ -585,14 +586,14 @@ sub menuBrowse {
 			# track must be in cache, no memorizing
 			my $cache = Slim::Utils::Cache->new;
 			my $track = Plugins::Deezer::Plugin::renderItem( $client, $cache->get('deezer_meta_' . $id), { addArtistToTitle => 1 } );
-			$cb->([$track]);
+			$cb->( { items => [$track] } );
 
 		} elsif ( $type eq 'podcast' ) {
 
 			# we need to re-acquire the podcast itself
 			Plugins::Deezer::Plugin::getAPIHandler($client)->podcast(sub {
 				my $podcast = shift;
-				getPodcastEpisodes($client, $cb, $args, {
+				Plugins::Deezer::Plugin::getPodcastEpisodes($client, $cb, $args, {
 					id => $id,
 					podcast => $podcast,
 				} );
@@ -603,7 +604,7 @@ sub menuBrowse {
 			# episode must be in cache, no memorizing
 			my $cache = Slim::Utils::Cache->new;
 			my $episode = Plugins::Deezer::Plugin::renderItem( $client, $cache->get('deezer_episode_meta_' . $id) );
-			$cb->([$episode]);
+			$cb->( { items => [$episode] } );
 
 		}
 	}, $request );
