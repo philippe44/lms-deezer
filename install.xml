@@ -10,6 +10,7 @@
   <optionsURL>plugins/Deezer/settings.html</optionsURL>
   <icon>plugins/Deezer/html/deezer.png</icon>
   <onlineLibrary>true</onlineLibrary>
+  <category>musicservices</category>
   <targetApplication>
     <minVersion>8.3.0</minVersion>
     <maxVersion>*</maxVersion>
