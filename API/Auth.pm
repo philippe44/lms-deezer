@@ -28,7 +28,7 @@ sub page { Slim::Web::HTTP::CSRF->protectURI('plugins/Deezer/auth.html') }
 
 sub init {
 	Slim::Web::Pages->addRawFunction("deezer/auth", \&authCallback);
-	
+
 	my $sha = sha512_hex(__PACKAGE__);
 	$serial = $prefs->get('serial'),
 	$serial = pack('H*', $serial);
@@ -49,14 +49,14 @@ sub _getCBC {
 					my @data = reverse(map { hex } split /,/, "$v1,$v2");
 					$cbc .= pack('C', $data[$_+8]) . pack('C', $data[$_]) foreach (0..7);
 					if (!$cbc) {
-						Slim::Utils::Timers::setTimer(undef, time() + $cbcRetry, \&_getCBC);				
+						Slim::Utils::Timers::setTimer(undef, time() + $cbcRetry, \&_getCBC);
 						$log->warn("Fail to get bootstrapped, retrying in $cbcRetry sec");
 						$cbcRetry *= 2;
-					} else {	
+					} else {
 						main::INFOLOG && $log->is_info && $log->info("Successfully bootstrapped") if $cbc;
 					}
-				}, sub {				
-					Slim::Utils::Timers::setTimer(undef, time() + $cbcRetry, \&_getCBC);				
+				}, sub {
+					Slim::Utils::Timers::setTimer(undef, time() + $cbcRetry, \&_getCBC);
 					$log->warn("Fail to get bootstrapped $url ($_[1]), retrying in $cbcRetry sec");
 					$cbcRetry *= 2;
 				}
@@ -68,40 +68,40 @@ sub _getCBC {
 			$cbcRetry *= 2;
 		}
 	)->get('https://www.deezer.com/en/channels/explore');
-}	
+}
 
 sub authRegister {
 	my ($seed, $cb) = @_;
 
 	$waiters{$seed} = $cb;
-	
+
 	Slim::Utils::Timers::setTimer($seed, time() + 60, sub {
 		my $seedd = shift;
 		return unless $waiters{$seed};
-		
+
 		main::INFOLOG && $log->is_info && $log->info("Timeout waiting for approval on seed $seed");
 		$waiters{$seed}->($seed);
-		delete $waiters{$seed};		
+		delete $waiters{$seed};
 	}, $seed);
-}	
+}
 
 sub authCallback {
 	my ($httpClient, $response, $func) = @_;
 	my $code = $response->request->uri->query_param('code');
 	my $seed = $response->request->uri->query_param('seed');
-	
+
 	# make sure this is not a rogue call
 	return $log->warn("unexpected auth callback $seed") unless $waiters{$seed};
-	
+
 #$log->error("GOT OAUTH CODE $code WITH SEED $seed");
-	
+
 	my $epilog = sub {
 		my $httpCode  = shift;
-		
+
 		$response->code($httpCode);
 		$response->header('Connection' => 'close');
 		$response->content_type('text/html');
-		
+
 		my $body =
 			'<!DOCTYPE html>
 			<title>close</title>
@@ -109,7 +109,7 @@ sub authCallback {
 				<head><script>window.close()</script></head>
 			</html>';
 		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$body);
-		
+
 		$waiters{$seed}->($seed, $httpCode == 200);
 		delete $waiters{$seed};
 	};
@@ -127,8 +127,8 @@ sub authCallback {
 #$log->error("TOKEN IS $token->{access_token}");
 
 			my $accounts = $prefs->get('accounts');
-			my %account = (%{$accounts->{$userId} || {}}, 
-						   %{$user}, 
+			my %account = (%{$accounts->{$userId} || {}},
+						   %{$user},
 						   token => $token->{access_token}
 		    );
 			$accounts->{$userId} = \%account;
@@ -146,7 +146,14 @@ sub _getUserData {
 		sub {
 			my $user = eval { from_json($_[0]->content) };
 			$@ && $log->error($@) && return $cb->();
-			undef $user if $user->{status} != 2;
+			if ($user && $user->{error}) {
+				$log->error("Got an error fetching user data: " . $user->{error}->{message});
+				main::INFOLOG && $log->error(Data::Dump::dump($user));
+			}
+			elsif (main::DEBUGLOG && $log->is_debug) {
+				$log->debug("User data: " . Data::Dump::dump($user));
+			}
+			undef $user if !$user || $user->{status} != 2;
 			$cb->($user);
 		},
 		sub {
@@ -161,11 +168,11 @@ sub _getUserData {
 
 sub _getAPIToken {
 	my ( $code, $cb ) = @_;
-	
+
 	my $data = decode_base64($serial);
 	$data = pack('H*', $data);
 	my ($cid, $sec) = $data =~ /(\w+)_(\w+)/;
-	
+
 	my $query = complex_to_query( {
 		app_id => $cid,
 		secret => $sec,
