@@ -460,7 +460,7 @@ sub getFavorites {
 		my $timestamp = shift;
 
 		# no cache, so we can use /me
-		$self->_get("/user/me/$type", sub {
+		$self->_get("/user/$userId/$type", sub {
 			my $result = shift;
 
 			my $items = [ map { $_ } @{$result->{data} || []} ] if $result;
@@ -523,7 +523,7 @@ sub getCollectionFingerprint {
 	my $sort = $type eq 'playlists' ? 'time_mod' : 'time_add';
 
 	# no cache, so we can use /me
-	$self->_get("/user/me/$type", sub {
+	$self->_get("/user/$userId/$type", sub {
 		my $result = shift;
 
 		my $fingerprint = {
@@ -797,6 +797,25 @@ sub _getUserContext {
 	$cb->();
 }
 
+sub getUserFromARL {
+	my ($cb, $arl) = @_;
+
+	my $params = {
+		method => 'deezer.getUserData',
+		_cookies => { arl => $arl },
+	};
+
+	__PACKAGE__->_ajax( sub {
+		my $result = shift;
+		my $user = {
+			id => $result->{results}->{USER}->{USER_ID},
+			name => $result->{results}->{USER}->{BLOG_NAME},
+		};
+
+		$cb->($user);
+	}, $params );
+}
+
 sub _getTokens {
 	my ($self, $cb, $mode) = @_;
 
@@ -845,6 +864,14 @@ sub _ajax {
 	my $ttl = delete $params->{_ttl} || USER_CONTENT_TTL;
 	my %headers = ( 'Content-Type' => delete $params->{_contentType} || 'application/x-www-form-urlencoded' );
 	$headers{Cookie} = join ' ', map { "$_=$cookies->{$_}" } keys %$cookies if $cookies;
+	
+	# TODO
+	# LMS memorizes all cookies so it can keep SID and we don't want that...
+	# but if we clean the cookie jar every time, then SID is lost and it is needed between calls. That means
+	# that current logic does not work, and ARL should be given once then only SID should be used until it expires.
+	# For now, we'll ignore that and this is an issue only when adding/refreshing a user if a wrong arl is given
+	# or for users with multiple profiles assigned to different players
+	# Slim::Networking::Async::HTTP::cookie_jar->clear('.deezer.com');
 
 	$params->{api_token} ||= 'null';
 
@@ -906,7 +933,7 @@ sub _get {
 	my $pageSize = delete $params->{_page} || PAGE_SIZE;
 
 	my $profile  = Plugins::Deezer::API->getUserdata($self->userId);
-	$params->{access_token} = $profile->{token};
+	#$params->{access_token} = $profile->{token};
 	$params->{limit} ||= DEFAULT_LIMIT;
 
 	my $cacheKey = "deezer_resp:$url:" . join(':', map {

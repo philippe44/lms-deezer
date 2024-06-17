@@ -6,7 +6,7 @@
 				<th>[% "PLUGIN_DEEZER_ACCOUNT" | string %][% "COLON" | string %]</th>
 				<th>[% "PLUGIN_DEEZER_IMPORT_LIBRARY"| string %][% "COLON" | string %]</th>
 				<th></th>
-				<th>[% "PLUGIN_DEEZER_ARL_TOKEN" | string %][% "COLON" | string %]</th>				
+				<!-- <th>[% "PLUGIN_DEEZER_ARL_TOKEN" | string %][% "COLON" | string %]</th>				 -->
 			</tr>
 		[% FOREACH creds = credentials %]
 			[% accountName = creds.name; accountId = creds.id %]
@@ -21,9 +21,9 @@
 				<td style="vertical-align: middle">
 					<input name="delete_[% accountId %]" type="submit" value="[% "DELETE" | string %]" class="stdclick" />
 				</td>				
-				<td style="vertical-align: middle">
-					<input type="password" name="pref_arl_[% accountId %]" value="[% creds.arl %]" size="15">
-				</td>
+				<!-- <td style="vertical-align: middle"> -->
+					<!-- <input type="password" name="pref_arl_[% accountId %]" value="[% creds.arl %]" size="15"> -->
+				<!-- </td> -->
 			</tr>
 			</tr>
 		[% END %]
@@ -39,7 +39,10 @@
 
 	[% WRAPPER setting title="" desc="" %]
 		<input name="seed" type="hidden" value="[% seed %]" />
-		<input name="addAccount" type="submit" onclick="oauthLaunch('[% authLink %]')" value="[% "PLUGIN_DEEZER_ADD_ACCOUNT" | string %]" class="stdclick" />
+		[% "ARL" %]&nbsp
+		<input name="arl" id="arl" type="stdedit" size="30" />		
+		<!-- <input name="addAccount" type="submit" onclick="oauthLaunch('[% authLink %]')" value="[% "PLUGIN_DEEZER_ADD_ACCOUNT" | string %]" class="stdclick" /> -->
+		<input name="addAccount" type="submit" value="[% "PLUGIN_DEEZER_ADD_ACCOUNT" | string %]" class="stdclick" />
 	[% END %]
 
 	[% WRAPPER setting title="PLUGIN_DEEZER_UNFOLD" desc="PLUGIN_DEEZER_UNFOLD_DESC" %]

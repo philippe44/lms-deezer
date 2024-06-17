@@ -24,13 +24,8 @@ PLUGIN_DEEZER_AUTH_FAILED
 	FR	Échec d'autorisation, ou compte non Premium.
 
 PLUGIN_DEEZER_ADD_ACCOUNT
-	CS	Přidat účet
-	DA	Tilføj konto
-	DE	Konto hinzufügen
-	EN	Add Account
-	FR	Ajouter un compte
-	IT	Aggiungi Account
-	NL	Account toevoegen
+	EN	Add/Refresh
+	FR	Ajouter/Rafraichir
 
 PLUGIN_DEEZER_AUTH
 	CS	Autorizace Deezer
