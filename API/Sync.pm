@@ -85,7 +85,7 @@ sub _get {
 
 	if ($userId) {
 		my $profile  = Plugins::Deezer::API->getUserdata($userId) || {};
-		$params->{access_token} = $profile->{token};
+		#$params->{access_token} = $profile->{token};
 	}
 
 	my $query = complex_to_query($params);
