@@ -42,6 +42,7 @@ my $log = logger('plugin.deezer');
 my $prefs = preferences('plugin.deezer');
 
 my %apiClients;
+my %contexts;
 my $tzOffset = tz_local_offset();
 
 use constant PAGE_SIZE => 50;
@@ -63,13 +64,13 @@ sub refreshArl {
 	main::INFOLOG && $log->is_info && $log->info("Refreshing Arl for user $userId");
 	Slim::Utils::Timers::killTimers($userId, \&refreshArl);
 
-	__PACKAGE__->_getTokens( sub {
-		my ($tokens, $mode) = @_;
+	_getUserContext( $userId, sub {
+		my ($context) = @_;
 
 		my $args = {
 			method => 'user.getArl',
-			api_token => $tokens->{csrf},
-			_cookies => $mode,
+			api_token => $context->{csrf},
+			_cookies => { arl => $profile->{arl} },
 		};
 
 		__PACKAGE__->_ajax( sub {
@@ -79,10 +80,11 @@ sub refreshArl {
 			return unless $profile->{arl};
 
 			if ( $result && $result->{results} ) {
-				$profile->{arl} = $result->{results};
+				$profile->{arl} = $contexts{$userId}->{arl} = $result->{results};
 				$prefs->set('accounts', $accounts);
 			}
-
+			
+#$log->error("THIS IS CONTEXTS ", Data::Dump::dump(%contexts));			
 			# (re)starting refresh timer
 			main::INFOLOG && $log->is_info && $log->info("Refreshed Arl for user $userId");
 			Slim::Utils::Timers::setTimer($userId, time() + 24 * 3600, \&refreshArl, $userId);
@@ -138,13 +140,13 @@ sub search {
 sub gwSearch {
 	my ($self, $cb, $args) = @_;
 
-	$self->_getUserContext( sub {
-		my ($tokens, $mode) = @_;
-		return $cb->() unless $tokens;
+	_getUserContext( $self->userId, sub {
+		my ($context) = @_;
+		return $cb->() unless $context;
 
 		my $params = {
 			method => 'deezer.pageSearch',
-			api_token => $tokens->{csrf},
+			api_token => $context->{csrf},
 			_contentType => 'application/json',
 			_cacheKey => 'pageSearch:' . $args->{search},
 		};
@@ -232,13 +234,13 @@ sub radioTracks {
 sub flowTracks {
 	my ($self, $cb, $params) = @_;
 
-	$self->_getUserContext( sub {
-		my ($tokens, $mode) = @_;
-		return $cb->() unless $tokens;
+	_getUserContext( $self->userId, sub {
+		my ($context) = @_;
+		return $cb->() unless $context;
 
 		my $args = {
 			method => 'radio.getUserRadio',
-			api_token => $tokens->{csrf},
+			api_token => $context->{csrf},
 			_contentType => 'application/json',
 		};
 
@@ -260,7 +262,7 @@ sub flowTracks {
 #$log->error(Data::Dump::dump(\@trackTokens), Data::Dump::dump(\@trackIds));
 			return $cb->() unless @trackTokens;
 
-			$self->_getProviders( $cb, $tokens->{license}, $params->{quality}, \@trackTokens, \@trackIds );
+			$self->_getProviders( $cb, $context->{license}, $params->{quality}, \@trackTokens, \@trackIds );
 		}, $args, $content );
 	} );
 }
@@ -541,6 +543,7 @@ sub getCollectionFingerprint {
 	});
 }
 
+=comment
 sub updateFavorite {
 	my ($self, $cb, $action, $type, $id) = @_;
 
@@ -573,7 +576,46 @@ sub updateFavorite {
 		onError => sub { $cb->($_[1]); },
 	} );
 }
+=cut
 
+sub updateFavorite {
+	my ($self, $cb, $action, $type, $id) = @_;
+
+	return $cb() unless $action && $type && $id;
+
+	# make favorites as updated
+	$self->updatedFavorites("$type.s", 1);
+	
+	_getUserContext( $self->userId, sub {
+		my ($context) = @_;
+		return $cb->() unless $context;
+		
+		my $args = {
+			api_token => $context->{csrf},
+			_contentType => 'application/json',
+			_cookies => { sid => $context->{sid} },
+		};
+		
+		# do the necessary soup to make it accepted by the gw-light
+		my $content;
+		
+		if ($type =~ /album|artist/) {
+			my $verb = uc(substr($type, 0, 3)) . '_ID';			
+			$content->{$verb} = $id;			
+			$action = 'delete' unless $action eq 'add';			
+			$args->{method} = "$type.$action" . 'Favorite';			
+		} elsif ($type eq 'track') {	
+			$content->{IDS} = [ $id ];
+			$action = 'remove' unless $action eq 'add';
+			$args->{method} = "song.$action" . 'Favorites';			
+		}
+		
+		main::INFOLOG && $log->is_info && $log->info("updating favorites ($action) with ", Data::Dump::dump($args, $content));	
+		$self->_ajax( $cb, $args, encode_json($content));
+	} );
+}
+
+=comment
 sub updatePlaylist {
 	my ($self, $cb, $action, $id, $trackId) = @_;
 
@@ -603,19 +645,49 @@ sub updatePlaylist {
 		onError => sub { $cb->($_[1]); },
 	} );
 }
+=cut
+
+sub updatePlaylist {
+	my ($self, $cb, $action, $id, $trackId) = @_;
+
+	# mark that playlist as need to be refreshed. After the DEFAULT_TTL
+	# the _get will also have forgotten it, no need to go further
+	$cache->set('deezer_playlist_refresh_' . $id, DEFAULT_TTL);
+
+	_getUserContext( $self->userId, sub {
+		my ($context) = @_;
+		return $cb->() unless $context;
+		
+		my $args = {
+			method => $action eq 'add' ? 'playlist.addSongs' : 'playlist.deleteSongs',
+			api_token => $context->{csrf},
+			_contentType => 'application/json',
+			_cookies => { sid => $context->{sid} },
+		};
+		
+		my $content = {
+			offset => -1,
+			playlist_id => $id,
+			songs => [ [ $trackId, 0 ] ],
+		};
+		
+		main::INFOLOG && $log->is_info && $log->info("update playlist $id ($action) with $trackId");
+		$self->_ajax( $cb, $args, encode_json($content));
+	} );
+}
 
 sub dislike {
 	my ($self, $cb, $type, $id) = @_;
 
-	$self->_getUserContext( sub {
-		my ($tokens, $mode) = @_;
-		return $cb->() unless $tokens;
+	_getUserContext( $self->userId, sub {
+		my ($context) = @_;
+		return $cb->() unless $context;
 
 		my $args = {
 			method => 'favorite_dislike.add',
-			api_token => $tokens->{csrf},
+			api_token => $context->{csrf},
 			_contentType => 'application/json',
-			_cookies => $mode,
+			_cookies => { sid => $context->{sid} },
 		};
 
 		my $content = encode_json( {
@@ -634,15 +706,15 @@ sub dislike {
 sub listened {
 	my ($self, $id) = @_;
 
-	$self->_getUserContext( sub {
-		my ($tokens, $mode) = @_;
-		return unless $tokens;
+	_getUserContext( $self->userId, sub {
+		my ($context) = @_;
+		return unless $context;
 
 		my $args = {
 			method => 'log.listen',
-			api_token => $tokens->{csrf},
+			api_token => $context->{csrf},
 			_contentType => 'application/json',
-			_cookies => $mode,
+			_cookies => { sid => $context->{sid} },
 		};
 
 		my $content = encode_json( {
@@ -664,16 +736,16 @@ sub listened {
 sub getTrackUrl {
 	my ($self, $cb, $ids, $params) = @_;
 
-	$self->_getUserContext( sub {
-		my ($tokens, $mode) = @_;
-		return $cb->() unless $tokens;
+	_getUserContext( $self->userId, sub {
+		my ($context) = @_;
+		return $cb->() unless $context;
 
-#$log->error("THAT WHAT WE HAVE ", Data::Dump::dump($tokens));
+#$log->error("THAT CONTEXTS WE HAVE ", Data::Dump::dump($context));
 		my $args = {
 			method => 'song.getListData',
-			api_token => $tokens->{csrf},
+			api_token => $context->{csrf},
 			_contentType => 'application/json',
-			_cookies => $mode,
+			_cookies => { sid => $context->{sid} },
 		};
 
 		my $content = encode_json( { sng_ids => $ids } );
@@ -686,7 +758,7 @@ sub getTrackUrl {
 
 			return $cb->() unless @trackTokens;
 
-			$self->_getProviders( $cb, $tokens->{license}, $params->{quality}, \@trackTokens, \@trackIds );
+			$self->_getProviders( $cb, $context->{license}, $params->{quality}, \@trackTokens, \@trackIds );
 		}, $args, $content);
 	} );
 }
@@ -694,15 +766,15 @@ sub getTrackUrl {
 sub getEpisodesUrl {
 	my ($self, $cb, $id) = @_;
 
-	$self->_getUserContext( sub {
-		my ($tokens, $mode) = @_;
-		return $cb->() unless $tokens;
+	_getUserContext( $self->userId, sub {
+		my ($context) = @_;
+		return $cb->() unless $context;
 
 		my $args = {
 			method => 'episode.getData',
-			api_token => $tokens->{csrf},
+			api_token => $context->{csrf},
 			_contentType => 'application/json',
-			_cookies => $mode,
+			_cookies => { sid => $context->{sid} },
 		};
 
 		my $content = encode_json( {
@@ -786,15 +858,34 @@ sub _getProviders {
 }
 
 sub _getUserContext {
-	my ($self, $cb) = @_;
+	my ($userId, $cb) = @_;
+	
+	my $accounts = $prefs->get("accounts");
+	return $log->error("unknown user id $userId") && $cb->() unless $accounts->{$userId};
+	
+	my $context = $contexts{$userId};
+	main::INFOLOG && $log->is_info && $log->info("context will expire in ", $context->{expiration} - time());
+	return $cb->($context) if $context->{sid} && time() < $context->{expiration};
+	
+	# we don't have a SID yet
+	main::INFOLOG && $log->is_info && $log->info("need a new session");
+	
+	my $params = {
+		method => 'deezer.getUserData',
+		_cookies => { arl => $context->{arl} },
+	};
 
-	my $profile = Plugins::Deezer::API->getUserdata($self->userId);
-	my $arl = $profile->{arl} if $profile;
+	__PACKAGE__->_ajax( sub {
+		my $result = shift;
+		$context->{csrf} = $result->{results}->{checkForm};
+		$context->{sid} = $result->{results}->{SESSION_ID};
+		$context->{license} = $result->{results}->{USER}->{OPTIONS}->{license_token};
+		$context->{expiration} = time() + $result->{results}->{USER}->{OPTIONS}->{expiration_timestamp} - $result->{results}->{USER}->{OPTIONS}->{timestamp} - 3600*24;
+		
+		main::INFOLOG && $log->is_info && $log->info("got session $context->{sid}");
 
-	return $self->_getTokens( $cb, { arl => $arl } ) if $arl && $profile->{status} == 2;
-
-	$log->error("ARL token is required, can't play");
-	$cb->();
+		$cb->($context);
+	}, $params );
 }
 
 sub getUserFromARL {
@@ -816,6 +907,21 @@ sub getUserFromARL {
 	}, $params );
 }
 
+=comment
+sub _getUserContext {
+	my ($self, $cb) = @_;
+
+	my $profile = Plugins::Deezer::API->getUserdata($self->userId);
+	my $arl = $profile->{arl} if $profile;
+
+	return $self->_getTokens( $cb, { arl => $arl } ) if $arl && $profile->{status} == 2;
+
+	$log->error("ARL token is required, can't play");
+	$cb->();
+}
+=cut
+
+=comment
 sub _getTokens {
 	my ($self, $cb, $mode) = @_;
 
@@ -836,25 +942,7 @@ sub _getTokens {
 		$cb->($tokens, $mode);
 	}, $params );
 }
-
-sub _getSession {
-	my ($self, $cb) = @_;
-
-	my $session = $cache->get('deezer_session');
-
-	if ($session) {
-		main::INFOLOG && $log->is_info && $log->info("Got session from cache");
-		$cb->($session);
-		return;
-	}
-
-	main::INFOLOG && $log->is_info && $log->info("Need a new session");
-
-	$self->_ajax( sub {
-			$session = shift->{results}->{SESSION};
-			$cb->($session);
-	}, { method => 'deezer.ping' } );
-}
+=cut
 
 sub _ajax {
 	my ($self, $cb, $params, $content) = @_;
@@ -891,7 +979,7 @@ sub _ajax {
 
 	Slim::Networking::SimpleAsyncHTTP->new(
 		sub {
-			my $result = eval { from_json(shift->content) };
+			my $result = eval { from_json($_[0]->content) };
 
 			$@ && $log->error($@);
 			$log->debug(Data::Dump::dump($result)) if $@ || (main::DEBUGLOG && $log->is_debug);
@@ -909,15 +997,164 @@ sub _ajax {
 }
 
 =comment
-sub getAPIToken {
-	my ( $self, $cb ) = @_;
+sub _gwSearch {
+	my ($self, $cb, $args) = @_;
 
-	my $userId = $self->userId;
-	my $token = $cache->get("deezer_at_$userId");
+	_getUserContext( $self->userId, sub {
+		my ($context) = @_;
+		return $cb->() unless $context;
 
-	return $cb->($token) if $token;
+		my $params = {
+			method => 'deezer.pageSearch',
+			api_token => $context->{csrf},
+			_contentType => 'application/json',
+			_cacheKey => 'pageSearch:' . $args->{search},
+		};
 
-	Plugins::Deezer::API::Auth->refreshAPIToken($cb, $self->userId);
+		my $content = encode_json( {
+			nb => $args->{limit} || DEFAULT_LIMIT,
+			start => 0,
+			suggest => 'false',
+			top_tracks => 'false',
+			artist_suggest => 'false',
+			query => $args->{search}
+		} );
+
+		$self->_gwPost( sub {
+			$cb->($_[0]->{results});
+		}, $params, $content );
+	} );
+}
+=cut
+
+=comment
+sub _gwPost {
+	my ($self, $cb, $params, $content) = @_;
+
+	my $cookies = delete $params->{_cookies};
+	my $cacheKey = 'deezer_gw_' . delete $params->{_cacheKey} if $params->{_cacheKey};
+	my $ttl = delete $params->{_ttl} || DEFAULT_TTL;
+	my %headers = (
+		Cookie => join ' ', map { "$_=$cookies->{$_}" } keys %$cookies,
+	);
+	
+	main::INFOLOG && $log->is_info && $log->info("Using cache key '$trace'") if $cacheKey;
+	
+	# TEMP
+	$params->{_page} = 3;
+
+	# TODO
+	$params->{api_token} ||= 'null';
+	
+	my $pageSize = delete $params->{_page} || PAGE_SIZE;
+	$params->{limit} ||= DEFAULT_LIMIT;
+	my $maxLimit = 0;
+	if ($params->{limit} > $pageSize) {
+		$maxLimit = $params->{limit};
+		$params->{limit} = $pageSize;
+	}
+	
+	# TODO
+	# LMS memorizes all cookies so it can keep SID and we don't want that...
+	# but if we clean the cookie jar every time, then SID is lost and it is needed between calls. That means
+	# that current logic does not work, and ARL should be given once then only SID should be used until it expires.
+	# For now, we'll ignore that and this is an issue only when adding/refreshing a user if a wrong arl is given
+	# or for users with multiple profiles assigned to different players
+	# Slim::Networking::Async::HTTP::cookie_jar->clear('.deezer.com');
+
+	my $query = complex_to_query( {
+		%$params,
+		input => '3',
+		api_version => '1.0',
+	} );
+
+	main::INFOLOG && $log->is_info && $log->info("GET $query ");
+
+	if ( $cacheKey && (my $cached = $cache->get($cacheKey)) ) {
+		main::INFOLOG && $log->is_info && $log->info("returning from cache $cacheKey");
+		return $cb->($cached);
+	}
+
+	Slim::Networking::SimpleAsyncHTTP->new(
+		sub {
+			my $result = eval { from_json(shift->content) };
+
+			$@ && $log->error($@);
+			$log->debug(Data::Dump::dump($result)) if $@ || (main::DEBUGLOG && $log->is_debug);
+
+			$cache->set($cacheKey, $result, $ttl) if $cacheKey;
+			$cb->($result);
+			
+			
+						my $response = shift;
+
+			my $result = eval { from_json($response->content) };
+
+			$@ && $log->error($@);
+			main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($result));
+
+			# note that when querying compound types like 'chart', there is no 'total' as the result is
+			# a hash with keys for tracks, artists, albums and podcasts *and* the {data] key is a sub-key
+			# of these. This means that _get only works because of lack of total so we do not do the amap
+			# request which otherwise would try to take {data} key and push it into results. This also means
+			# that for compound, we get what we get, no paging (seems that it's limited to 100 anyway
+
+			if ($maxLimit && ref $result eq 'HASH' && $maxLimit > $result->{total} && $result->{total} - $pageSize > 0) {
+				my $remaining = $result->{total} - $pageSize;
+				main::INFOLOG && $log->is_info && $log->info("We need to page to get $remaining more results (total: $result->{total})");
+
+				my @offsets;
+				my $offset = $pageSize;
+				my $maxOffset = min($maxLimit, MAX_LIMIT, $result->{total});
+				do {
+					push @offsets, $offset;
+					$offset += $pageSize;
+				} while ($offset < $maxOffset);
+
+				if (scalar @offsets) {
+					Async::Util::amap(
+						inputs => \@offsets,
+						action => sub {
+							my ($input, $acb) = @_;
+							$self->_get($url, sub {
+								# only return the first argument, the second would be considered an error
+								$acb->($_[0]);
+							}, {
+								%$params,
+								index => $input,
+								_nocache => 1,
+							});
+						},
+						at_a_time => 4,
+						cb => sub {
+							my ($results, $error) = @_;
+
+							foreach (@$results) {
+								next unless ref $_ && $_->{data};
+								push @{$result->{data}}, @{$_->{data}};
+							}
+
+							$cache->set($cacheKey, $result, $ttl) unless $noCache;
+
+							$cb->($result);
+						}
+					);
+
+					return;
+				}
+			}
+
+			$cache->set($cacheKey, $result, $ttl) unless $noCache;
+
+			$cb->($result);
+		},
+		sub {
+			my ($http, $error) = @_;
+			$log->warn("Error: $error");
+			main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($http));
+			$cb->();
+		},
+	)->post(GURL . "?$query", %headers, $content);
 }
 =cut
 
