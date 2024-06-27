@@ -266,7 +266,7 @@ sub _renderItem {
 			url => "deezerlive://$entry->{id}",
 			image => $image,
 		};
-		
+
 	} elsif ( $entry->{__TYPE__} eq 'livestream' ) {
 
 		my $image = Plugins::Deezer::API->getImageUrl( {
@@ -281,7 +281,7 @@ sub _renderItem {
 			url => "deezerlive://$entry->{LIVESTREAM_ID}",
 			image => $image,
 		};
-		
+
 	} elsif ( $entry->{type} eq 'show' ) {
 
 		# fabricate an expected podcast entry to fit existing model
@@ -444,7 +444,7 @@ sub _pageItems {
 sub liveStream {
 	my ( $self, $cb, $id ) = @_;
 
-	$self->_getUserContext( sub {
+	Plugins::Deezer::API::Async::_getUserContext($self->userId, sub {
 		my ($tokens, $mode) = @_;
 		return $cb->() unless $tokens;
 
@@ -492,7 +492,7 @@ sub _userQuery {
 		return;
 	}
 
-	$self->_getUserContext( sub {
+	Plugins::Deezer::API::Async::_getUserContext($self->userId, sub {
 		my ($tokens, $mode) = @_;
 		return $cb->() unless $tokens;
 
