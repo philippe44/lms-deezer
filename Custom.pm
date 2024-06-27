@@ -445,12 +445,12 @@ sub liveStream {
 	my ( $self, $cb, $id ) = @_;
 
 	Plugins::Deezer::API::Async::_getUserContext($self->userId, sub {
-		my ($tokens, $mode) = @_;
-		return $cb->() unless $tokens;
+		my ($context) = @_;
+		return $cb->() unless $context;
 
 		my $args = {
 			method => 'livestream.getData',
-			api_token => $tokens->{csrf},
+			api_token => $context->{csrf},
 			_contentType => 'application/json',
 		};
 
@@ -493,12 +493,12 @@ sub _userQuery {
 	}
 
 	Plugins::Deezer::API::Async::_getUserContext($self->userId, sub {
-		my ($tokens, $mode) = @_;
-		return $cb->() unless $tokens;
+		my ($context) = @_;
+		return $cb->() unless $context;
 
 		my $args = {
 			%$params,
-			api_token => $tokens->{csrf},
+			api_token => $context->{csrf},
 		};
 
 		# might be empty, so must be undef then
