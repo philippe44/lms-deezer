@@ -284,7 +284,7 @@ sub handleFeed {
 	},{
 		name => cstring($client, 'PLUGIN_DEEZER_FLOW'),
 		image => 'plugins/Deezer/html/flow.png',
-		play => 'deezer://user/me/flow.dzr',
+		play => 'deezer://user/' . $userId . '/flow.dzr',
 		type => 'outline',
 		items => [{
 			name => cstring($client, 'PLUGIN_DEEZER_FLOW'),
