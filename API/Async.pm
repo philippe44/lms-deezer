@@ -372,6 +372,7 @@ sub history {
 	} );
 }
 
+=comment
 sub personal {
 	my ($self, $cb) = @_;
 	$self->_get('/user/' . $self->userId . '/personal_songs', sub {
@@ -383,6 +384,38 @@ sub personal {
 	}, {
 		_ttl => USER_CONTENT_TTL,
 		limit => MAX_LIMIT,
+	} );
+}
+=cut
+
+sub personal {
+	my ($self, $cb) = @_;
+
+	_getUserContext( $self->userId, sub {
+		my ($context) = @_;
+		return $cb->() unless $context;
+		
+		my $args = {
+			method => 'personal_song.getList',
+			api_token => $context->{csrf},
+			_contentType => 'application/json',
+			_cookies => { sid => $context->{sid} },
+		};
+		
+		# TODO: this needs to be paged at some point
+		my $content = {
+			nb => MAX_LIMIT,
+			start => 0,
+		};
+		
+		main::INFOLOG && $log->is_info && $log->info("getting personal songs");	
+		
+		$self->_ajax( sub {
+			my $personal = shift->{results};
+			# TODO: this is upside-down, custom becomes main now...
+			my $tracks = Plugins::Deezer::Custom::_cacheTrackMetadata($personal->{data}) if $personal;
+			$cb->($tracks);
+		}, $args, encode_json($content));
 	} );
 }
 
