@@ -12,6 +12,7 @@ use JSON::XS::VersionOneAndTwo;
 use List::Util qw(min);
 use Digest::MD5 qw(md5_hex);
 use URI::Escape qw(uri_escape);
+use Scalar::Util qw(blessed);
 
 use Slim::Networking::SimpleAsyncHTTP;
 use Slim::Networking::Async::HTTP;
@@ -63,16 +64,10 @@ sub refreshArl {
 
 	main::INFOLOG && $log->is_info && $log->info("Refreshing Arl for user $userId");
 	Slim::Utils::Timers::killTimers($userId, \&refreshArl);
-
-	_getUserContext( $userId, sub {
-		my ($context) = @_;
-
-		my $args = {
-			method => 'user.getArl',
-			api_token => $context->{csrf},
-			_cookies => { arl => $profile->{arl} },
-		};
-
+	
+	__PACKAGE__->_ajax( sub {
+		my $result = shift;
+		
 		__PACKAGE__->_ajax( sub {
 			my $result = shift;
 
@@ -84,14 +79,20 @@ sub refreshArl {
 				$prefs->set('accounts', $accounts);
 			}
 			
-#$log->error("THIS IS CONTEXTS ", Data::Dump::dump(%contexts));			
 			# (re)starting refresh timer
 			main::INFOLOG && $log->is_info && $log->info("Refreshed Arl for user $userId");
 			Slim::Utils::Timers::setTimer($userId, time() + 24 * 3600, \&refreshArl, $userId);
-		}, $args );
-	}, { arl => $profile->{arl} } );
+		}, {
+			method => 'user.getArl',
+			api_token => $result->{results}->{checkForm},
+			_cookies => { sid => $result->{results}->{SESSION_ID} },
+		} );	
+	}, {
+		method => 'deezer.getUserData',
+		_cookies => { arl => $profile->{arl} },
+	} );
 }
-
+	
 sub new {
 	my ($class, $args) = @_;
 
@@ -139,30 +140,19 @@ sub search {
 
 sub gwSearch {
 	my ($self, $cb, $args) = @_;
-
-	_getUserContext( $self->userId, sub {
-		my ($context) = @_;
-		return $cb->() unless $context;
-
-		my $params = {
-			method => 'deezer.pageSearch',
-			api_token => $context->{csrf},
-			_contentType => 'application/json',
-			_cacheKey => 'pageSearch:' . $args->{search},
-		};
-
-		my $content = encode_json( {
-			nb => $args->{limit} || DEFAULT_LIMIT,
-			start => 0,
-			suggest => 'false',
-			top_tracks => 'false',
-			artist_suggest => 'false',
-			query => $args->{search}
-		} );
-
-		$self->_ajax( sub {
-			$cb->($_[0]->{results});
-		}, $params, $content );
+	
+	$self->gwCall( sub {
+		$cb->($_[0]->{results});
+	}, {
+		method => 'deezer.pageSearch',
+		_cacheKey => 'pageSearch:' . $args->{search},
+	}, {
+		nb => $args->{limit} || DEFAULT_LIMIT,
+		start => 0,
+		suggest => 'false',
+		top_tracks => 'false',
+		artist_suggest => 'false',
+		query => $args->{search}
 	} );
 }
 
@@ -233,38 +223,27 @@ sub radioTracks {
 
 sub flowTracks {
 	my ($self, $cb, $params) = @_;
+	
+	my $content = {
+		user_id => $self->userId,
+		tuner => $params->{flow} ? 'discovery' : 'default',
+	};
 
-	_getUserContext( $self->userId, sub {
-		my ($context) = @_;
-		return $cb->() unless $context;
-
-		my $args = {
-			method => 'radio.getUserRadio',
-			api_token => $context->{csrf},
-			_contentType => 'application/json',
-		};
-
-		my $content = {
-			user_id => $self->userId,
-			tuner => $params->{flow} ? 'discovery' : 'default',
-		};
-
-		if ($params->{mode} =~ /genre|mood/ ) {
-			$content->{config_id} = ($params->{mode} eq 'genre' ?  'genre-' : '') . $params->{type};
-		}
-
-		$content = encode_json($content);
-
-		$self->_ajax( sub {
-			my $result = shift;
-			my @trackTokens = map { $_->{TRACK_TOKEN} } @{ $result->{results}->{data} };
-			my @trackIds = map { $_->{SNG_ID} } @{ $result->{results}->{data} };
+	if ($params->{mode} =~ /genre|mood/ ) {
+		$content->{config_id} = ($params->{mode} eq 'genre' ?  'genre-' : '') . $params->{type};
+	}
+	
+	$self->gwCall( sub {
+		my ($result, $context) = @_;
+		my @trackTokens = map { $_->{TRACK_TOKEN} } @{ $result->{results}->{data} };
+		my @trackIds = map { $_->{SNG_ID} } @{ $result->{results}->{data} };
 #$log->error(Data::Dump::dump(\@trackTokens), Data::Dump::dump(\@trackIds));
-			return $cb->() unless @trackTokens;
-
-			$self->_getProviders( $cb, $context->{license}, $params->{quality}, \@trackTokens, \@trackIds );
-		}, $args, $content );
-	} );
+		return $cb->() unless @trackTokens;
+		
+		$self->_getProviders( $cb, $context->{license}, $params->{quality}, \@trackTokens, \@trackIds );
+	}, {
+		method => 'radio.getUserRadio',
+	}, $content );
 }
 
 sub compound {
@@ -390,32 +369,19 @@ sub personal {
 
 sub personal {
 	my ($self, $cb) = @_;
-
-	_getUserContext( $self->userId, sub {
-		my ($context) = @_;
-		return $cb->() unless $context;
-		
-		my $args = {
-			method => 'personal_song.getList',
-			api_token => $context->{csrf},
-			_contentType => 'application/json',
-			_cookies => { sid => $context->{sid} },
-		};
-		
-		# TODO: this needs to be paged at some point
-		my $content = {
-			nb => MAX_LIMIT,
-			start => 0,
-		};
-		
-		main::INFOLOG && $log->is_info && $log->info("getting personal songs");	
-		
-		$self->_ajax( sub {
-			my $personal = shift->{results};
-			# TODO: this is upside-down, custom becomes main now...
-			my $tracks = Plugins::Deezer::Custom::_cacheTrackMetadata($personal->{data}) if $personal;
-			$cb->($tracks);
-		}, $args, encode_json($content));
+	
+	main::INFOLOG && $log->is_info && $log->info("getting personal songs");	
+	
+	$self->gwCall( sub {
+		my $personal = shift->{results};
+		# TODO: this is upside-down, custom becomes main now...
+		my $tracks = Plugins::Deezer::Custom::_cacheTrackMetadata($personal->{data}) if $personal;
+		$cb->($tracks);
+	}, {
+		method => 'personal_song.getList' 
+	}, {
+		nb => MAX_LIMIT,
+		start => 0,
 	} );
 }
 
@@ -619,33 +585,23 @@ sub updateFavorite {
 	# make favorites as updated
 	$self->updatedFavorites("$type.s", 1);
 	
-	_getUserContext( $self->userId, sub {
-		my ($context) = @_;
-		return $cb->() unless $context;
-		
-		my $args = {
-			api_token => $context->{csrf},
-			_contentType => 'application/json',
-			_cookies => { sid => $context->{sid} },
-		};
-		
-		# do the necessary soup to make it accepted by the gw-light
-		my $content;
-		
-		if ($type =~ /album|artist/) {
-			my $verb = uc(substr($type, 0, 3)) . '_ID';			
-			$content->{$verb} = $id;			
-			$action = 'delete' unless $action eq 'add';			
-			$args->{method} = "$type.$action" . 'Favorite';			
-		} elsif ($type eq 'track') {	
-			$content->{IDS} = [ $id ];
-			$action = 'remove' unless $action eq 'add';
-			$args->{method} = "song.$action" . 'Favorites';			
-		}
-		
-		main::INFOLOG && $log->is_info && $log->info("updating favorites ($action) with ", Data::Dump::dump($args, $content));	
-		$self->_ajax( $cb, $args, encode_json($content));
-	} );
+	my $content;
+	my $method;
+
+	# do the necessary soup to make it accepted by the gw-light		
+	if ($type =~ /album|artist/) {
+		my $verb = uc(substr($type, 0, 3)) . '_ID';			
+		$content->{$verb} = $id;			
+		$action = 'delete' unless $action eq 'add';			
+		$method = "$type.$action" . 'Favorite';			
+	} elsif ($type eq 'track') {	
+		$content->{IDS} = [ $id ];
+		$action = 'remove' unless $action eq 'add';
+		$method = "song.$action" . 'Favorites';			
+	}
+	
+	main::INFOLOG && $log->is_info && $log->info("updating favorites ($action) with $method", Data::Dump::dump($content));	
+	$self->gwCall( $cb, { method => $method }, $content );
 }
 
 =comment
@@ -686,141 +642,81 @@ sub updatePlaylist {
 	# mark that playlist as need to be refreshed. After the DEFAULT_TTL
 	# the _get will also have forgotten it, no need to go further
 	$cache->set('deezer_playlist_refresh_' . $id, DEFAULT_TTL);
-
-	_getUserContext( $self->userId, sub {
-		my ($context) = @_;
-		return $cb->() unless $context;
-		
-		my $args = {
-			method => $action eq 'add' ? 'playlist.addSongs' : 'playlist.deleteSongs',
-			api_token => $context->{csrf},
-			_contentType => 'application/json',
-			_cookies => { sid => $context->{sid} },
-		};
-		
-		my $content = {
-			offset => -1,
-			playlist_id => $id,
-			songs => [ [ $trackId, 0 ] ],
-		};
-		
-		main::INFOLOG && $log->is_info && $log->info("update playlist $id ($action) with $trackId");
-		$self->_ajax( $cb, $args, encode_json($content));
+	
+	main::INFOLOG && $log->is_info && $log->info("update playlist $id ($action) with $trackId");
+	
+	$self->gwCall( $cb, { 
+		method => $action eq 'add' ? 'playlist.addSongs' : 'playlist.deleteSongs'
+	}, {
+		offset => -1,
+		playlist_id => $id,
+		songs => [ [ $trackId, 0 ] ],
 	} );
 }
 
 sub dislike {
 	my ($self, $cb, $type, $id) = @_;
-
-	_getUserContext( $self->userId, sub {
-		my ($context) = @_;
-		return $cb->() unless $context;
-
-		my $args = {
-			method => 'favorite_dislike.add',
-			api_token => $context->{csrf},
-			_contentType => 'application/json',
-			_cookies => { sid => $context->{sid} },
-		};
-
-		my $content = encode_json( {
-			ID => $id,
-			TYPE => $type eq 'track' ? 'song' : 'artist',
-			CTX => {
-				id => $self->userId,
-				t => 'dynamic_page_user_radio'
-			}
-		} );
-
-		$self->_ajax( $cb, $args, $content);
+	
+	$self->gwCall( $cb, { 
+		method => 'favorite_dislike.add',
+	}, {	
+		ID => $id,
+		TYPE => $type eq 'track' ? 'song' : 'artist',
+		CTX => {
+			id => $self->userId,
+			t => 'dynamic_page_user_radio'
+		}
 	} );
 }
 
 sub listened {
 	my ($self, $id) = @_;
-
-	_getUserContext( $self->userId, sub {
-		my ($context) = @_;
-		return unless $context;
-
-		my $args = {
-			method => 'log.listen',
-			api_token => $context->{csrf},
-			_contentType => 'application/json',
-			_cookies => { sid => $context->{sid} },
-		};
-
-		my $content = encode_json( {
-			params => {
-				media => {
-					id => $id,
-					type => 'song',
-				},
-				ts_listen => time(),
-				type => 0,
-			},
-		} );
-
-		$self->_ajax( sub {	}, $args, $content);
+	
+	$self->gwCall( sub { }, { 
+		method => 'log.listen',
+	}, {
+		params => {
+		media => {
+			id => $id,
+			type => 'song',
+		},
+		ts_listen => time(),
+		type => 0,
+		},
 	} );
-
 }
 
 sub getTrackUrl {
 	my ($self, $cb, $ids, $params) = @_;
-
-	_getUserContext( $self->userId, sub {
-		my ($context) = @_;
-		return $cb->() unless $context;
-
-#$log->error("THAT CONTEXTS WE HAVE ", Data::Dump::dump($context));
-		my $args = {
-			method => 'song.getListData',
-			api_token => $context->{csrf},
-			_contentType => 'application/json',
-			_cookies => { sid => $context->{sid} },
-		};
-
-		my $content = encode_json( { sng_ids => $ids } );
-
-		$self->_ajax( sub {
-			my $result = shift;
-			my @trackTokens = map { $_->{TRACK_TOKEN} } @{ $result->{results}->{data} };
-			my @trackIds = map { $_->{SNG_ID} } @{ $result->{results}->{data} };
+	
+	$self->gwCall( sub {
+		my ($result, $context) = @_;
+		my @trackTokens = map { $_->{TRACK_TOKEN} } @{ $result->{results}->{data} };
+		my @trackIds = map { $_->{SNG_ID} } @{ $result->{results}->{data} };
 #$log->error(Data::Dump::dump(\@trackTokens), Data::Dump::dump(\@trackIds));
 
-			return $cb->() unless @trackTokens;
+		return $cb->() unless @trackTokens;
 
-			$self->_getProviders( $cb, $context->{license}, $params->{quality}, \@trackTokens, \@trackIds );
-		}, $args, $content);
-	} );
+		$self->_getProviders( $cb, $context->{license}, $params->{quality}, \@trackTokens, \@trackIds );
+	}, { 
+		method => 'song.getListData' 
+	}, { 
+		sng_ids => $ids }
+	);
 }
 
 sub getEpisodesUrl {
 	my ($self, $cb, $id) = @_;
+	
+	$self->gwCall( sub {
+		my $result = shift;
 
-	_getUserContext( $self->userId, sub {
-		my ($context) = @_;
-		return $cb->() unless $context;
-
-		my $args = {
-			method => 'episode.getData',
-			api_token => $context->{csrf},
-			_contentType => 'application/json',
-			_cookies => { sid => $context->{sid} },
-		};
-
-		my $content = encode_json( {
-			episode_id => $id,
-		} );
-
-		$self->_ajax( sub {
-			my $result = shift;
-
-			$result = $result->{results} if $result;
-
-			$cb->($result || []);
-		}, $args, $content);
+		$result = $result->{results} if $result;
+		$cb->($result || []);
+	}, {	
+		method => 'episode.getData',
+	}, {
+		episode_id => $id,
 	} );
 }
 
@@ -890,35 +786,41 @@ sub _getProviders {
 	)->post(UURL, 'Content-Type' => 'application/json', $content);
 }
 
-sub _getUserContext {
-	my ($userId, $cb) = @_;
+sub gwCall {
+	my ($self, $cb, $args, $content) = @_;
+	my $context = $contexts{$self->userId};
 	
-	my $accounts = $prefs->get("accounts");
-	return $log->error("unknown user id $userId") && $cb->() unless $accounts->{$userId};
-	
-	my $context = $contexts{$userId};
-	main::INFOLOG && $log->is_info && $log->info("context will expire in ", $context->{expiration} - time());
-	return $cb->($context) if $context->{sid} && time() < $context->{expiration};
-	
-	# we don't have a SID yet
-	main::INFOLOG && $log->is_info && $log->info("need a new session");
-	
-	my $params = {
-		method => 'deezer.getUserData',
-		_cookies => { arl => $context->{arl} },
-	};
-
-	__PACKAGE__->_ajax( sub {
+	# we need to acquire and SID
+	return $self->_ajax( sub {
 		my $result = shift;
 		$context->{csrf} = $result->{results}->{checkForm};
 		$context->{sid} = $result->{results}->{SESSION_ID};
 		$context->{license} = $result->{results}->{USER}->{OPTIONS}->{license_token};
 		$context->{expiration} = time() + $result->{results}->{USER}->{OPTIONS}->{expiration_timestamp} - $result->{results}->{USER}->{OPTIONS}->{timestamp} - 3600*24;
-		
-		main::INFOLOG && $log->is_info && $log->info("got session $context->{sid}");
+				
+		main::INFOLOG && $log->is_info && $log->info("got a new session for ARL $context->{arl}");
+		$self->gwCall($cb, $args, $content);
+	}, {
+		method => 'deezer.getUserData',
+		_cookies => { arl => $context->{arl} },
+	} ) unless $context->{sid} && time() < $context->{expiration};
 
-		$cb->($context);
-	}, $params );
+	# we have all we need, just do the gw-api call	
+	main::INFOLOG && $log->is_info && $log->info("context will expire in ", $context->{expiration} - time()) if $context->{expiration};
+	
+	$args = { %$args, 
+		api_token => $context->{csrf},		
+		_cookies => { sid => $context->{sid} },
+	};
+	
+	if ($content) {
+		$args->{_contentType} = 'application/json',
+		$content = encode_json($content);
+	}	
+		
+	$self->_ajax( sub {
+		$cb->($_[0], $context);
+	}, $args, $content);
 }
 
 sub getUserFromARL {
@@ -939,43 +841,6 @@ sub getUserFromARL {
 		$cb->($user);
 	}, $params );
 }
-
-=comment
-sub _getUserContext {
-	my ($self, $cb) = @_;
-
-	my $profile = Plugins::Deezer::API->getUserdata($self->userId);
-	my $arl = $profile->{arl} if $profile;
-
-	return $self->_getTokens( $cb, { arl => $arl } ) if $arl && $profile->{status} == 2;
-
-	$log->error("ARL token is required, can't play");
-	$cb->();
-}
-=cut
-
-=comment
-sub _getTokens {
-	my ($self, $cb, $mode) = @_;
-
-	my $params = {
-		method => 'deezer.getUserData',
-		_cookies => $mode,
-	};
-
-	$self->_ajax( sub {
-		my $result = shift;
-		my $tokens = {
-			user => $result->{results}->{USER_TOKEN},
-			license => $result->{results}->{USER}->{OPTIONS}->{license_token},
-			csrf => $result->{results}->{checkForm},
-			expiration => $result->{results}->{USER}->{OPTIONS}->{expiration_timestamp},
-		};
-
-		$cb->($tokens, $mode);
-	}, $params );
-}
-=cut
 
 sub _ajax {
 	my ($self, $cb, $params, $content) = @_;
@@ -1028,37 +893,6 @@ sub _ajax {
 		},
 	)->$method(GURL . "?$query", %headers, $content);
 }
-
-=comment
-sub _gwSearch {
-	my ($self, $cb, $args) = @_;
-
-	_getUserContext( $self->userId, sub {
-		my ($context) = @_;
-		return $cb->() unless $context;
-
-		my $params = {
-			method => 'deezer.pageSearch',
-			api_token => $context->{csrf},
-			_contentType => 'application/json',
-			_cacheKey => 'pageSearch:' . $args->{search},
-		};
-
-		my $content = encode_json( {
-			nb => $args->{limit} || DEFAULT_LIMIT,
-			start => 0,
-			suggest => 'false',
-			top_tracks => 'false',
-			artist_suggest => 'false',
-			query => $args->{search}
-		} );
-
-		$self->_gwPost( sub {
-			$cb->($_[0]->{results});
-		}, $params, $content );
-	} );
-}
-=cut
 
 =comment
 sub _gwPost {

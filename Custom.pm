@@ -444,26 +444,15 @@ sub _pageItems {
 sub liveStream {
 	my ( $self, $cb, $id ) = @_;
 
-	Plugins::Deezer::API::Async::_getUserContext($self->userId, sub {
-		my ($context) = @_;
-		return $cb->() unless $context;
-
-		my $args = {
-			method => 'livestream.getData',
-			api_token => $context->{csrf},
-			_contentType => 'application/json',
-		};
-
-		my $content = encode_json( {
-			livestream_id => $id,
-			supported_codecs => ['mp3', 'aac'],
-		} );
-
-		$self->_ajax( sub {
-			my $result = shift;
-			my $urls = $result->{results}->{LIVESTREAM_URLS}->{data} if $result->{results}->{LIVESTREAM_URLS};
-			$cb->($urls);
-		}, $args, $content );
+	$self->gwCall( sub {
+		my $result = shift;
+		my $urls = $result->{results}->{LIVESTREAM_URLS}->{data} if $result->{results}->{LIVESTREAM_URLS};
+		$cb->($urls);
+	}, {
+		method => method => 'livestream.getData',
+	}, {
+		livestream_id => $id,
+		supported_codecs => ['mp3', 'aac'],
 	} );
 }
 
@@ -492,25 +481,12 @@ sub _userQuery {
 		return;
 	}
 
-	Plugins::Deezer::API::Async::_getUserContext($self->userId, sub {
-		my ($context) = @_;
-		return $cb->() unless $context;
+	$self->gwCall( sub {
+		my $results = $_[0]->{results} if $_[0];
 
-		my $args = {
-			%$params,
-			api_token => $context->{csrf},
-		};
-
-		# might be empty, so must be undef then
-		my $data = encode_json($content) if $content;
-
-		$self->_ajax( sub {
-			my $results = $_[0]->{results} if $_[0];
-
-			$cache->set($cacheKey, $results, $ttl) if $results;
-			$cb->($results);
-		}, $args, $data );
-	} );
+		$cache->set($cacheKey, $results, $ttl) if $results;
+		$cb->($results);
+	}, $params, $content );
 }
 
 #
