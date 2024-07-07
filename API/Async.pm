@@ -338,6 +338,26 @@ sub radios {
 
 sub history {
 	my ($self, $cb) = @_;
+	
+	main::INFOLOG && $log->is_info && $log->info("getting history songs");	
+	
+	$self->gwCall( sub {
+		my $history = shift->{results};
+		# TODO: this is upside-down, custom becomes main now...
+		my $tracks = Plugins::Deezer::Custom::_cacheTrackMetadata($history->{data}) if $history;
+		$cb->($tracks);
+	}, {
+		method => 'user.getSongsHistory',
+		_ttl => USER_CONTENT_TTL,
+	}, {
+		nb => MAX_LIMIT,
+		start => 0,
+	} );
+}
+
+=comment
+sub history {
+	my ($self, $cb) = @_;
 	$self->_get('/user/' . $self->userId . '/history', sub {
 		my $history = $_[0]->{data};
 
@@ -350,6 +370,7 @@ sub history {
 		limit => MAX_LIMIT,
 	} );
 }
+=cut
 
 =comment
 sub personal {
@@ -378,7 +399,8 @@ sub personal {
 		my $tracks = Plugins::Deezer::Custom::_cacheTrackMetadata($personal->{data}) if $personal;
 		$cb->($tracks);
 	}, {
-		method => 'personal_song.getList' 
+		method => 'personal_song.getList',
+		_ttl => USER_CONTENT_TTL,		
 	}, {
 		nb => MAX_LIMIT,
 		start => 0,
@@ -601,7 +623,9 @@ sub updateFavorite {
 	}
 	
 	main::INFOLOG && $log->is_info && $log->info("updating favorites ($action) with $method", Data::Dump::dump($content));	
-	$self->gwCall( $cb, { method => $method }, $content );
+	$self->gwCall( $cb, { 
+		method => $method,
+	}, $content );
 }
 
 =comment
@@ -646,7 +670,7 @@ sub updatePlaylist {
 	main::INFOLOG && $log->is_info && $log->info("update playlist $id ($action) with $trackId");
 	
 	$self->gwCall( $cb, { 
-		method => $action eq 'add' ? 'playlist.addSongs' : 'playlist.deleteSongs'
+		method => $action eq 'add' ? 'playlist.addSongs' : 'playlist.deleteSongs',
 	}, {
 		offset => -1,
 		playlist_id => $id,
@@ -699,7 +723,7 @@ sub getTrackUrl {
 
 		$self->_getProviders( $cb, $context->{license}, $params->{quality}, \@trackTokens, \@trackIds );
 	}, { 
-		method => 'song.getListData' 
+		method => 'song.getListData',
 	}, { 
 		sng_ids => $ids }
 	);
@@ -790,7 +814,7 @@ sub gwCall {
 	my ($self, $cb, $args, $content) = @_;
 	my $context = $contexts{$self->userId};
 	
-	# we need to acquire and SID
+	# we need to acquire an SID
 	return $self->_ajax( sub {
 		my $result = shift;
 		$context->{csrf} = $result->{results}->{checkForm};
@@ -810,19 +834,29 @@ sub gwCall {
 	# we have all we need, just do the gw-api call	
 	main::INFOLOG && $log->is_info && $log->info("context will expire in ", $context->{expiration} - time()) if $context->{expiration};
 	
+	# a ttl but no cache key means we have to make one but here we hash everything
+	# as some '_' might be part of caching. This means that _ttl is cached as well... 
+	if ($args->{_ttl} && !$args->{_cacheKey}) {
+		my $cacheKey = { %$args, %$content };
+		$cacheKey = join(':', map { $_ . $cacheKey->{$_} } sort grep { $_ !~ /^_/ } keys %$cacheKey);
+		$cacheKey .= $context->{csrf} . $context->{sid};
+		$args->{_cacheKey} = md5_hex($cacheKey);
+		main::INFOLOG && $log->is_info && $log->info("computing hashkey $args->{_cacheKey}");
+	}	
+	
 	$args = { %$args, 
 		api_token => $context->{csrf},		
 		_cookies => { sid => $context->{sid} },
 	};
-	
+
 	if ($content) {
 		$args->{_contentType} = 'application/json',
 		$content = encode_json($content);
-	}	
+	}
 		
 	$self->_ajax( sub {
 		$cb->($_[0], $context);
-	}, $args, $content);
+	}, $args, $content );
 }
 
 sub getUserFromARL {
