@@ -796,7 +796,9 @@ sub gwCall {
 		$context->{csrf} = $result->{results}->{checkForm};
 		$context->{sid} = $result->{results}->{SESSION_ID};
 		$context->{license} = $result->{results}->{USER}->{OPTIONS}->{license_token};
-		$context->{expiration} = time() + $result->{results}->{USER}->{OPTIONS}->{expiration_timestamp} - $result->{results}->{USER}->{OPTIONS}->{timestamp} - 3600*24;
+		# $context->{expiration} = time() + $result->{results}->{USER}->{OPTIONS}->{expiration_timestamp} - $result->{results}->{USER}->{OPTIONS}->{timestamp} - 3600*24;
+		# I really don't know when these expire, but certainly not with that timestamp
+		$context->{expiration} = time() + 3600*4;
 				
 		main::INFOLOG && $log->is_info && $log->info("got a new session for ARL $context->{arl}");
 		$self->gwCall($cb, $args, $content);
