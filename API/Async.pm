@@ -570,7 +570,7 @@ sub updateFavorite {
 
 	my $profile = Plugins::Deezer::API->getUserdata($self->userId);
 	my $access_token = $profile->{token} if $profile;
-	return $cb() unless $action && $type && $id && $access_token;
+	return $cb->() unless $action && $type && $id && $access_token;
 
 	my $item = $type;
 	$type .= 's';
