@@ -393,7 +393,7 @@ sub _getNextTrack {
 
 sub _setTrackParams {
 	my ( $song, $track, $successCb, $errorCb, $linger ) = @_;
-	return $errorCb('no track available') unless $track;
+	return $errorCb->('no track available') unless $track;
 
 	my $client = $song->master();
 	my ($format, $bitrate) = $track->{format} =~ /([^_]+)_?(\d+)?/i;
