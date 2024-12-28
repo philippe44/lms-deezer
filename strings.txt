@@ -2,12 +2,16 @@ PLUGIN_DEEZER_NAME
 	EN	Deezer
 
 PLUGIN_DEEZER_DESC
+	DA	Deezer udvidelsesmodul (Plugin) for LMS (uden forbindelse til MySqueezebox.com).
 	DE	Deezer Plugin zur Integration mit LMS, ohne Verbindung zu MySqueezebox.com.
 	EN	Deezer Plugin for LMS, does not depend on MySqueezebox.com.
 	FR	Plugin Deezer pour LMS (sans lien avec MySqueezebox.com).
 	HU	Deezer Plugin for LMS, nem függ a MySqueezebox.com webhelytől.
 
 PLUGIN_DEEZER_REGISTER
+	DA	Klik "Tilføj Konto" for at åbne en Deezer login side og tillad udvidelsesmodulet
+	DA	adgang til din konto. ARL token værdien er påkrævet, den kan findes ved at benytte
+	DA	Deezer, Google, YouTube eller Reddit. <br>BEMÆRK at kun en Premium konto kan bruges.
 	DE	Klicken Sie "Konto hinzufügen" um das Deezer Loginfenster zu öffnen, und dem
 	DE	Plugin Zugriff auf ihr Konto zu geben. Der ARL Wert wird benötigt, um verlustfrei
 	DE	streamen zu können. Hinweise zum Finden des Wertes kennen Google, Youtube oder Reddit.
@@ -23,19 +27,21 @@ PLUGIN_DEEZER_REGISTER
 	HU	a beszerzéséhez. <br>FIGYELEM: CSAK PREMIUM FIÓKKAL HASZNÁLHATÓ
 
 PLUGIN_DEEZER_AUTH_FAILED
+	DA	Autorisation mislykkedes, eller ingen Premium konto.
 	DE	Anmeldung fehlgeschlagen, oder kein Premium Konto.
 	EN	Authorization failed, or no Premium account.
 	FR	Échec d'autorisation, ou compte non Premium.
 	HU	Az engedélyezés nem sikerült, vagy nincs Premium-fiók.
 
 PLUGIN_DEEZER_ADD_ACCOUNT
+	DA	Tilføj/Opdatér
 	EN	Add/Refresh
 	FR	Ajouter/Rafraichir
 	HU	Hozzáadás/Frissítés
 
 PLUGIN_DEEZER_AUTH
 	CS	Autorizace Deezer
-	DA	Autoriser Deezer
+	DA	Autorisér Deezer
 	DE	Deezer Anmeldung
 	EN	Deezer Authorization
 	FR	Autorisation Deezer
@@ -45,7 +51,7 @@ PLUGIN_DEEZER_AUTH
 
 PLUGIN_DEEZER_IMPORT_LIBRARY
 	CS	Importovat
-	DA	Importer
+	DA	Importér
 	DE	Importieren
 	EN	Import
 	FR	Importer
@@ -78,7 +84,7 @@ PLUGIN_DEEZER_FOLLOW_LINK
 	IT	Il seguente link reindirizza all'autenticazione di Deezer. Per favore, garantisci l'accesso al tuo account Deezer a Logitech Media Server e torna in questa pagina una volta completato il login.
 
 PLUGIN_DEEZER_REQUIRES_CREDENTIALS
-	DA	Gå til Settings/advanced/Deezer for at autorisere med Deezer
+	DA	Gå til Indstillinger/advanced/Deezer for at autorisere med Deezer
 	DE	Bitte melden Sie sich in den Server-Einstellungen unter Erweitert/Deezer an Deezer an.
 	EN	Please go to Settings/Advanced/Deezer to authenticate with Deezer.
 	FR	Veuillez vous connecter à Deezer en accédant aux réglages du plugin Deezer (paramètres/avancé/Deezer ou préférences/serveur/Deezer).
@@ -126,6 +132,7 @@ PLUGIN_DEEZER_MOODS
 	IT	Moods
 
 PLUGIN_DEEZER_CHART
+	DA	Hitlister
 	EN	Charts
 	FR	Tops
 	HU	Diagramok
@@ -152,7 +159,7 @@ PLUGIN_DEEZER_PROGRESS_READ_ALBUMS
 
 PLUGIN_DEEZER_ARTISTS_PROGRESS
 	CS	Interpeti Deezeru
-	DA	Deezer Artister
+	DA	Deezer kunstnere
 	DE	Deezer Interpreten
 	EN	Deezer Artists
 	FR	Artistes Deezer
@@ -162,7 +169,7 @@ PLUGIN_DEEZER_ARTISTS_PROGRESS
 
 PLUGIN_DEEZER_PROGRESS_READ_ARTISTS
 	CS	Načítání interpetů (%s)...
-	DA	Henter Artister (%s)...
+	DA	Henter kunstnere (%s)...
 	DE	Lese Interpreten (%s)...
 	EN	Fetching Artists (%s)...
 	FR	Récupération des artistes (%s)...
@@ -172,7 +179,7 @@ PLUGIN_DEEZER_PROGRESS_READ_ARTISTS
 
 PLUGIN_DEEZER_PLAYLISTS_PROGRESS
 	CS	Seznamy skladeb Deezeru
-	DA	Deezer Afspilningslister
+	DA	Deezer afspilningslister
 	DE	Deezer Wiedergabelisten
 	EN	Deezer Playlists
 	FR	Listes de lecture Deezer
@@ -182,7 +189,7 @@ PLUGIN_DEEZER_PLAYLISTS_PROGRESS
 
 PLUGIN_DEEZER_PROGRESS_READ_PLAYLISTS
 	CS	Získávání seznamů skladeb (%s)...
-	DA	Henter Afspilningslister (%s)...
+	DA	Henter afspilningslister (%s)...
 	DE	Lese Wiedergabelisten (%s)...
 	EN	Fetching Playlists (%s)...
 	FR	Récupération des listes de lecture (%s)...
@@ -207,12 +214,14 @@ PLUGIN_DEEZER_TOP_TRACKS
 	SV	Toppspår
 
 PLUGIN_DEEZER_ARL_TOKEN
+	DA	ARL token
 	DE	ARL Token
 	EN	ARL token
 	FR	Jeton ARL
 	HU	ARL token
 
 PLUGIN_DEEZER_RELATED
+	DA	Beslægtede
 	DE	Ähnliche Interpreten
 	EN	Related
 	FR	Artistes similaires
@@ -235,6 +244,7 @@ PLUGIN_DEEZER_DSTM_FLOW
 	EN	Deezer Flow
 
 PLUGIN_DEEZER_ON_DEEZER
+	DA	På Deezer
 	DE	Auf Deezer
 	EN	On Deezer
 	FR	Sur Deezer
@@ -250,23 +260,27 @@ PLUGIN_DEEZER_RAP
 	EN	Rap
 
 PLUGIN_DEEZER_ALTERNATIVE
+	DA	Indie & Alternativ
 	EN	Alternative
 	FR	Indie & Alternative
 	HU	Alternatív
 
 PLUGIN_DEEZER_KPOP
+	DA	Koreansk pop (K-Pop)
 	EN	K-Pop
 
 PLUGIN_DEEZER_JAZZ
 	EN	Jazz
 
 PLUGIN_DEEZER_CLASSICAL
+	DA	Klassisk musik
 	DE	Klassische Musik
 	EN	Classical
 	FR	Classique
 	HU	Klasszikus
 
 PLUGIN_DEEZER_CHANSON
+	DA	Sange
 	DE	Chanson
 	EN	Songs
 	FR	Chansons
@@ -285,53 +299,64 @@ PLUGIN_DEEZER_SOUL
 	FR	Soul & Funk
 
 PLUGIN_DEEZER_VARIETE
+	DA	Fransk pop
 	DE	Französische Popmusik
 	EN	French Pop
 	FR	Variété française
 	HU	Francia Pop
 
 PLUGIN_DEEZER_LOFI
+	DA	Low-Fidelity
 	EN	LoFi
 	FR	Lofi
 
 PLUGIN_DEEZER_RNB
+	DA	Rhythm & Blues
 	EN	R&B
 
 PLUGIN_DEEZER_DANCEEDM
+	DA	Dance & Elektronisk (EDM)
 	EN	Dance & EDM
 
 PLUGIN_DEEZER_MOTIVATION
+	DA	Workout
 	DE	Workout
 	EN	Motivation
 	HU	Motiváció
 
 PLUGIN_DEEZER_PARTY
+	DA	Fest
 	EN	Party
 	FR	Soirée
 	HU	Parti
 
 PLUGIN_DEEZER_CHILL
+	DA	Afslappende
 	EN	Chill
 	FR	Détente
 
 PLUGIN_DEEZER_MELANCHOLY
+	DA	Vemodig
 	DE	Traurig
 	EN	Melancholy
 	FR	Mélancolie
 
 PLUGIN_DEEZER_YOU_AND_ME
+	DA	Romantisk
 	DE	Liebe
 	EN	Love
 	FR	Romance
 	HU	Szerelem
 
 PLUGIN_DEEZER_FOCUS
+	DA	Fokus
 	DE	Fokus
 	EN	Focus
 	FR	Concentration
 	HU	Koncentráció
 
 PLUGIN_DEEZER_EMPOWERMENT
+	DA	Bekræftende (Empowerment)
 	EN	Girl Power
 
 PLUGIN_DEEZER_DSTM_SMART_RADIO
@@ -343,108 +368,126 @@ PLUGIN_DEEZER_DSTM_FLOW
 	EN	Deezer Flow
 
 PLUGIN_DEEZER_ADD_TO_FAVORITES
+	DA	Tilføj til Deezer favoritter
 	DE	Zu Deezer Favoriten hinzufügen
 	EN	Add to Deezer favorites
 	FR	Ajouter aux favoris Deezer
 	HU	Add hozzá a Deezer kedvenceihez
 
 PLUGIN_DEEZER_REMOVE_FROM_FAVORITES
+	DA	Slet fra Deezer favoritter
 	DE	Aus Deezer Favoriten entfernen
 	EN	Remove from Deezer favorites
 	FR	Supprimer des favoris Deezer
 	HU	Eltávolítás a Deezer kedvencei közül
 
 PLUGIN_DEEZER_ADD_TO_PLAYLIST
+	DA	Tilføj til en Deezer afspilleliste
 	DE	Zu Deezer Wiedergabeliste hinzufügen
 	EN	Add to a Deezer playlist
 	FR	Ajouter à une liste de lecture Deezer
 	HU	Hozzáadás a Deezer lejátszási listához
 
 PLUGIN_DEEZER_REMOVE_FROM_PLAYLIST
+	DA	Slet fra denne afspilleliste
 	DE	Aus dieser Wiedergabeliste entfernen
 	EN	Remove from this playlist
 	FR	Supprimer de cette liste de lecture
 	HU	Eltávolítás erről a lejátszási listáról
 
 PLUGIN_DEEZER_LIVE_PARAMS
+	DA	Parametre for livestreaming
 	DE	Livestreaming Einstellungen
 	EN	Live streaming parameters
 	FR	Paramètres streaming en direct
 	HU	Élő közvetítés paraméterei
 
 PLUGIN_DEEZER_LIVE_PARAMS_DESC
+	DA	Angiv minimum bitrate og ønsket format til livestreaming. Nærmeste tilgængelige vil blive valgt
 	DE	Definieren Sie die minimale Bitrate und das Datenformat für Livestreaming. Die am besten passende Qulaität wird ausgewählt
 	EN	Specify minimum bitrate and desired format for live streaming. Closest available will be selected
 	FR	Spécifie le débit minimum et le format désiré pour le streaming en direct. Le plus proche sera sélectionné
 	HU	Adja meg a minimális bitsebességet és a kívánt formátumot az élő közvetítéshez. A legközelebbi elérhető lesz kiválasztva
 
 PLUGIN_DEEZER_CHANNELS
+	DA	Kanaler
 	DE	Kanäle
 	EN	Channels
 	FR	Canaux
 	HU	Channels
 
 PLUGIN_DEEZER_EPISODES
+	DA	Afsnit
 	DE	Episoden
 	EN	Episodes
 	FR	Épisodes
 	HU	Epizódok
 
 PLUGIN_DEEZER_FLOW_DEFAULT
+	DA	Favoritter flow modus
 	DE	Favoriten Flow
 	EN	Favorites Flow mode
 	FR	Mode Flow favoris
 	HU	Kedvencek Flow mód
 
 PLUGIN_DEEZER_FLOW_DISCOVERY
+	DA	Discovery flow-tilstand
 	DE	Entdeckungs Flow
 	EN	Discovery Flow mode
 	FR	Mode Flow découverte
 	HU	Discovery Flow mód
 
 PLUGIN_DEEZER_DISLIKE_TITLE
+	DA	Kan ikke lide titlen 
 	DE	Titel entlieben
 	EN	Dislike this title
 	FR	Ne pas aimer cette chanson
 	HU	Nem tetszik ez a cím
 
 PLUGIN_DEEZER_DISLIKE_ARTIST
+	DA	Kan ikke lide kunstneren
 	DE	Interpret entlieben
 	EN	Dislike this artist
 	FR	Ne pas aimer cet(te) artiste
 	HU	Nem tetszik ez az előadó
 
 PLUGIN_DEEZER_EXPLORE
+	DA	Udforske
 	DE	Erkunden
 	EN	Explore
 	FR	Explorer
 	HU	Felfedezés
 
 PLUGIN_DEEZER_HISTORY
+	DA	Historik for lytning
 	DE	Hörverlauf
 	EN	Listening History
 	FR	Historique d'écoute
 	HU	Lejátszás előzmények
 
 PLUGIN_DEEZER_PERSONAL
+	DA	Personligt bibliotek
 	DE	Persönliche Sammlung
 	EN	Personal library
 	FR	Bibliothèque personnelle
 	HU	Személyes könyvtár
 
 PLUGIN_DEEZER_COLLECTION
+	DA	Mit bibliotek
 	DE	Meine Sammlung
 	EN	My collection
 	FR	Ma collection
 	HU	Saját gyűjtemény
 
 PLUGIN_DEEZER_UNFOLD
+	DA	Udfold biblioteksmenu
 	DE	Sammlungsmenu aufklappen
 	EN	Unfold collection menu
 	FR	Dérouler le menu collection
 	HU	Nyissa ki a gyűjtemény menüjét
 
 PLUGIN_DEEZER_UNFOLD_DESC
+	DA	Definér udfoldningsmodus for din biblioteksmenu
 	DE	Definieren Sie, wie Sie die Sammlung darstellen wollen
 	EN	Set the folding mode of your collection's menu
 	FR	Configure le déroulement du menu de votre collection
