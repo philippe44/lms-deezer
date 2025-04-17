@@ -24,10 +24,6 @@ our ($serial, $cbc);
 my $cbcRetry = 30;
 my (%waiters);
 
-# Define a robust desktop User-Agent string.
-my $desktopUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-my %headers   = ( "User-Agent" => $desktopUA );
-
 sub page { Slim::Web::HTTP::CSRF->protectURI('plugins/Deezer/auth.html') }
 
 sub init {
@@ -64,14 +60,14 @@ sub _getCBC {
 					$log->warn("Fail to get bootstrapped $url ($_[1]), retrying in $cbcRetry sec");
 					$cbcRetry *= 2;
 				}
-            )->get($url, %headers);
+			)->get($url);
 		},
 		sub {
 			Slim::Utils::Timers::setTimer(undef, time() + $cbcRetry, \&_getCBC);
 			$log->warn("Fail to get jumpstart ($_[1]), retrying in $cbcRetry sec");
 			$cbcRetry *= 2;
 		}
-    )->get('https://www.deezer.com/en/channels/explore', %headers);
+	)->get('https://www.deezer.com/en/channels/explore');
 }
 
 sub authRegister {
