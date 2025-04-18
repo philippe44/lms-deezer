@@ -602,7 +602,7 @@ sub updateFavorite {
 sub updateFavorite {
 	my ($self, $cb, $action, $type, $id) = @_;
 
-	return $cb() unless $action && $type && $id;
+	return $cb->() unless $action && $type && $id;
 
 	# make favorites as updated
 	$self->updatedFavorites("$type.s", 1);
