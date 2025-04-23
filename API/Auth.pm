@@ -16,6 +16,8 @@ use Slim::Utils::Strings qw(string);
 
 use Plugins::Deezer::API qw(AURL BURL);
 
+use constant DESKTOP_BROWSER => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
 my $cache = Slim::Utils::Cache->new();
 my $log = logger('plugin.deezer');
 my $prefs = preferences('plugin.deezer');
@@ -55,8 +57,7 @@ sub _getCBC {
 					} else {
 						main::INFOLOG && $log->is_info && $log->info("Successfully bootstrapped") if $cbc;
 					}
-				},
-				sub {
+				}, sub {
 					Slim::Utils::Timers::setTimer(undef, time() + $cbcRetry, \&_getCBC);
 					$log->warn("Fail to get bootstrapped $url ($_[1]), retrying in $cbcRetry sec");
 					$cbcRetry *= 2;
@@ -68,7 +69,7 @@ sub _getCBC {
 			$log->warn("Fail to get jumpstart ($_[1]), retrying in $cbcRetry sec");
 			$cbcRetry *= 2;
 		}
-	)->get('https://www.deezer.com/en/channels/explore', 'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+	)->get('https://www.deezer.com/en/channels/explore', 'User-Agent' => DESKTOP_BROWSER);
 }
 
 sub authRegister {
