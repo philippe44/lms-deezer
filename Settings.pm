@@ -25,50 +25,68 @@ sub prefs { return ($prefs, qw(quality liveformat liverate unfold_collection)) }
 sub handler {
 	my ($class, $client, $params, $callback, @args) = @_;
 
-	if ($params->{addAccount}) {
-		my $arl = $params->{arl};
-		main::INFOLOG && $log->is_info && $log->info("Adding/Refreshing account with arl $arl");
-		
-		Plugins::Deezer::API::Async::getUserFromARL( sub {	
-			my $user = shift;
-		
-			if ( my $userId = $user->{id} ) {
-				$user->{status} = 2;
-				$user->{arl} = $arl;
-			
-				main::INFOLOG && $log->is_info && $log->info("Added/refreshed user $user->{name} successfully");
 
-				my $accounts = $prefs->get('accounts');
-				my %account = (%{$accounts->{$userId} || {}}, 
-								%{$user}, 
-				);
-				$accounts->{$userId} = \%account;
-				$prefs->set('accounts', $accounts);
-			} else {
-				$params->{'warning'} = Slim::Utils::Strings::string('PLUGIN_DEEZER_AUTH_FAILED');
-				$log->error("Unable to add /refresh user with ARL $arl");
-			}
-			
-			my $body = $class->SUPER::handler( $client, $params );
-			$callback->($client, $params, $body, @args);
-		},  $arl );
+	if ($params->{addAccount}) {
+    my $arl = $params->{arl};
+    main::INFOLOG && $log->is_info && $log->info("Adding/Refreshing account with arl $arl");
+    
+    # Clear the cookie jar before making the request
+    Slim::Networking::Async::HTTP::cookie_jar->clear();
+    
+    Plugins::Deezer::API::Async::getUserFromARL( sub {    
+        my $user = shift;
+    
+        if ( my $userId = $user->{id} ) {
+            $user->{status} = 2;
+            $user->{arl} = $arl;
+        
+            main::INFOLOG && $log->is_info && $log->info("Added/refreshed user $user->{name} successfully");
+
+            my $accounts = $prefs->get('accounts') || {};
+            my %account = (%{$accounts->{$userId} || {}}, 
+                            %{$user}, 
+            );
+            $accounts->{$userId} = \%account;
+            $prefs->set('accounts', $accounts);
+            
+            # Debug output
+            main::DEBUGLOG && $log->is_debug && $log->debug("Accounts after adding: " . Data::Dump::dump($accounts));
+        } else {
+            $params->{'warning'} = Slim::Utils::Strings::string('PLUGIN_DEEZER_AUTH_FAILED');
+            $log->error("Unable to add /refresh user with ARL $arl");
+        }
+        
+        my $body = $class->SUPER::handler( $client, $params );
+        $callback->($client, $params, $body, @args);
+    },  $arl );
 		
-=comment		
-		Plugins::Deezer::API::Auth::authRegister($params->{seed}, sub {
-			my ($seed, $success) = @_;
-			$params->{'warning'} = Slim::Utils::Strings::string('PLUGIN_DEEZER_AUTH_FAILED') unless $success;
-			my $body = $class->SUPER::handler( $client, $params );
-			$callback->($client, $params, $body, @args);
-		} );
-=cut		
 		return;
 	}
 
+
 	if ( my ($deleteAccount) = map { /delete_(.*)/; $1 } grep /^delete_/, keys %$params ) {
-		my $accounts = $prefs->get('accounts') || {};
-		delete $accounts->{$deleteAccount};
-		$prefs->set('accounts', $accounts);
+    my $accounts = $prefs->get('accounts') || {};
+    
+    # Delete Account
+    delete $accounts->{$deleteAccount};
+    
+    # Save Changes
+    $prefs->set('accounts', $accounts);
+    
+    # Check if Account realy got deleted
+    my $updatedAccounts = $prefs->get('accounts') || {};
+    if (exists $updatedAccounts->{$deleteAccount}) {
+        $log->error("Failure while deleting Account $deleteAccount!");
+    } else {
+        $log->info("Account $deleteAccount successfully deleted.");
+    }
+    
+    # Remove Account entries from deezer.prefs
+    my $dontImportAccounts = $prefs->get('dontImportAccounts') || {};
+    delete $dontImportAccounts->{$deleteAccount};
+    $prefs->set('dontImportAccounts', $dontImportAccounts);
 	}
+
 
 	if ($params->{saveSettings}) {
 		my $dontImportAccounts = $prefs->get('dontImportAccounts') || {};

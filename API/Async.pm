@@ -46,6 +46,8 @@ my %apiClients;
 my %contexts;
 my $tzOffset = tz_local_offset();
 
+my %userCookieJars;  # Hash to store user-specific cookie jars
+
 use constant PAGE_SIZE => 50;
 
 sub init {
@@ -455,6 +457,8 @@ sub playlistTracks {
 	});
 }
 
+
+
 # User collections can be large - but have a known last updated timestamp.
 # Instead of statically caching data, then re-fetch everything, do a quick
 # lookup to get the latest timestamp first, then return from cache directly
@@ -811,124 +815,162 @@ sub _getProviders {
 }
 
 sub gwCall {
-	my ($self, $cb, $args, $content) = @_;
-	my $context = $contexts{$self->userId};
-	
-	# we need to acquire an SID
-	return $self->_ajax( sub {
-		my $result = shift;
-		$context->{csrf} = $result->{results}->{checkForm};
-		$context->{sid} = $result->{results}->{SESSION_ID};
-		$context->{license} = $result->{results}->{USER}->{OPTIONS}->{license_token};
-		# $context->{expiration} = time() + $result->{results}->{USER}->{OPTIONS}->{expiration_timestamp} - $result->{results}->{USER}->{OPTIONS}->{timestamp} - 3600*24;
-		# I really don't know when these expire, but certainly not with that timestamp
-		$context->{expiration} = time() + 3600*4;
-				
-		main::INFOLOG && $log->is_info && $log->info("got a new session for ARL $context->{arl}");
-		$self->gwCall($cb, $args, $content);
-	}, {
-		method => 'deezer.getUserData',
-		_cookies => { arl => $context->{arl} },
-	} ) unless $context->{sid} && time() < $context->{expiration};
+    my ($self, $cb, $args, $content) = @_;
+    my $context = $contexts{$self->userId};
+    
+    # Debug-Output for context
+    $log->error("CONTEXT DEBUG: User " . $self->userId . " context: " . Data::Dump::dump($context));
 
-	# we have all we need, just do the gw-api call	
-	main::INFOLOG && $log->is_info && $log->info("context will expire in ", $context->{expiration} - time()) if $context->{expiration};
-	
-	# a ttl but no cache key means we have to make one but here we hash everything
-	# as some '_' might be part of caching. This means that _ttl is cached as well... 
-	if ($args->{_ttl} && !$args->{_cacheKey}) {
-		my $cacheKey = { %$args, %$content };
-		$cacheKey = join(':', map { $_ . $cacheKey->{$_} } sort grep { $_ !~ /^_/ } keys %$cacheKey);
-		$cacheKey .= $context->{csrf} . $context->{sid};
-		$args->{_cacheKey} = md5_hex($cacheKey);
-		main::INFOLOG && $log->is_info && $log->info("computing hashkey $args->{_cacheKey}");
-	}	
-	
-	$args = { %$args, 
-		api_token => $context->{csrf},		
-		_cookies => { sid => $context->{sid} },
-	};
+    # Use the user-specific cookie jar
+    if ($userCookieJars{$self->userId}) {
+        local $Slim::Networking::Async::HTTP::cookieJar = $userCookieJars{$self->userId};
+    }
+    
+    # we need to acquire an SID
+    return $self->_ajax( sub {
+        my $result = shift;
+        $context->{csrf} = $result->{results}->{checkForm};
+        $context->{sid} = $result->{results}->{SESSION_ID};
+        $context->{license} = $result->{results}->{USER}->{OPTIONS}->{license_token};
+        # $context->{expiration} = time() + $result->{results}->{USER}->{OPTIONS}->{expiration_timestamp} - $result->{results}->{USER}->{OPTIONS}->{timestamp} - 3600*24;
+        # I really don't know when these expire, but certainly not with that timestamp
+        $context->{expiration} = time() + 3600*4;
+                
+        main::INFOLOG && $log->is_info && $log->info("got a new session for ARL $context->{arl}");
+        $self->gwCall($cb, $args, $content);
+    }, {
+        method => 'deezer.getUserData',
+        _cookies => { arl => $context->{arl} },
+    } ) unless $context->{sid} && time() < $context->{expiration};
 
-	if ($content) {
-		$args->{_contentType} = 'application/json',
-		$content = encode_json($content);
-	}
-		
-	$self->_ajax( sub {
-		$cb->($_[0], $context);
-	}, $args, $content );
+    # we have all we need, just do the gw-api call    
+    main::INFOLOG && $log->is_info && $log->info("context will expire in ", $context->{expiration} - time()) if $context->{expiration};
+    
+    # a ttl but no cache key means we have to make one but here we hash everything
+    # as some '_' might be part of caching. This means that _ttl is cached as well... 
+    if ($args->{_ttl} && !$args->{_cacheKey}) {
+        my $cacheKey = { %$args, %$content };
+        $cacheKey = join(':', map { $_ . $cacheKey->{$_} } sort grep { $_ !~ /^_/ } keys %$cacheKey);
+        $cacheKey .= $context->{csrf} . $context->{sid};
+        $args->{_cacheKey} = md5_hex($cacheKey);
+        main::INFOLOG && $log->is_info && $log->info("computing hashkey $args->{_cacheKey}");
+    }    
+    
+    $args = { %$args, 
+        api_token => $context->{csrf},        
+        _cookies => { sid => $context->{sid} },
+    };
+
+    if ($content) {
+        $args->{_contentType} = 'application/json',
+        $content = encode_json($content);
+    }
+        
+    $self->_ajax( sub {
+        $cb->($_[0], $context);
+    }, $args, $content );
 }
 
 sub getUserFromARL {
-	my ($cb, $arl) = @_;
+    my ($cb, $arl) = @_;
+    
+    # Clear the cookie jar before making the request
+    Slim::Networking::Async::HTTP::cookie_jar->clear();
+    
+    my $params = {
+        method => 'deezer.getUserData',
+        _cookies => { arl => $arl },
+        _nocache => 1,  # Force no caching
+    };
 
-	my $params = {
-		method => 'deezer.getUserData',
-		_cookies => { arl => $arl },
-	};
+    __PACKAGE__->_ajax( sub {
+        my $result = shift;
+        
+        # Debug output to see what we're getting
+        main::DEBUGLOG && $log->is_debug && $log->debug("getUserFromARL response: " . Data::Dump::dump($result));
+        
+        my $user = {};
+        
+        if ($result && $result->{results} && $result->{results}->{USER}) {
+            $user = {
+                id => $result->{results}->{USER}->{USER_ID},
+                name => $result->{results}->{USER}->{BLOG_NAME},
+            };
+            
+            main::INFOLOG && $log->is_info && $log->info("Got user data for: $user->{name} (ID: $user->{id})");
+        } else {
+            $log->error("Failed to get user data from ARL");
+            main::DEBUGLOG && $log->is_debug && $log->debug("Response: " . Data::Dump::dump($result));
+        }
 
-	__PACKAGE__->_ajax( sub {
-		my $result = shift;
-		my $user = {
-			id => $result->{results}->{USER}->{USER_ID},
-			name => $result->{results}->{USER}->{BLOG_NAME},
-		};
-
-		$cb->($user);
-	}, $params );
+        $cb->($user);
+    }, $params );
 }
+
 
 sub _ajax {
-	my ($self, $cb, $params, $content) = @_;
+    my ($self, $cb, $params, $content) = @_;
 
-	my $cookies = delete $params->{_cookies};
-	my $cacheKey = 'deezer_ajax_' . delete $params->{_cacheKey} if $params->{_cacheKey};
-	my $ttl = delete $params->{_ttl} || USER_CONTENT_TTL;
-	my %headers = ( 'Content-Type' => delete $params->{_contentType} || 'application/x-www-form-urlencoded' );
-	$headers{Cookie} = join ' ', map { "$_=$cookies->{$_}" } keys %$cookies if $cookies;
-	
-	# TODO
-	# LMS memorizes all cookies so it can keep SID and we don't want that...
-	# but if we clean the cookie jar every time, then SID is lost and it is needed between calls. That means
-	# that current logic does not work, and ARL should be given once then only SID should be used until it expires.
-	# For now, we'll ignore that and this is an issue only when adding/refreshing a user if a wrong arl is given
-	# or for users with multiple profiles assigned to different players
-	# Slim::Networking::Async::HTTP::cookie_jar->clear('.deezer.com');
+    my $cookies = delete $params->{_cookies};
+    
+    # Debug-Output to show used cookie
+    if ($cookies) {
+        my $userId = ref $self ? $self->userId : "unknown";
+        $log->error("COOKIE DEBUG: User $userId using cookies: " . Data::Dump::dump($cookies));
+    }
+    my $cacheKey = 'deezer_ajax_' . delete $params->{_cacheKey} if $params->{_cacheKey};
+    my $ttl = delete $params->{_ttl} || USER_CONTENT_TTL;
+    my $nocache = delete $params->{_nocache};
+    my %headers = ( 'Content-Type' => delete $params->{_contentType} || 'application/x-www-form-urlencoded' );
+    
+    # Clear the cookie jar before making the request
+    Slim::Networking::Async::HTTP::cookie_jar->clear();
+    
+    # Build cookie header manually
+    if ($cookies) {
+        $headers{Cookie} = join '; ', map { "$_=$cookies->{$_}" } keys %$cookies;
+        main::DEBUGLOG && $log->is_debug && $log->debug("Setting cookies: $headers{Cookie}");
+    }
+    
+    $params->{api_token} ||= 'null';
 
-	$params->{api_token} ||= 'null';
+    my $query = complex_to_query( {
+        %$params,
+        input => '3',
+        api_version => '1.0',
+    } );
 
-	my $query = complex_to_query( {
-		%$params,
-		input => '3',
-		api_version => '1.0',
-	} );
+    # Add a unique parameter to prevent caching by the server
+    $query .= "&_nocache=" . time() if $nocache;
 
-	my $method = $content ? 'post' : 'get';
-	main::INFOLOG && $log->is_info && $log->info(uc($method) . " ?$query ", $content ? Data::Dump::dump($content) : '');
+    my $method = $content ? 'post' : 'get';
+    main::INFOLOG && $log->is_info && $log->info(uc($method) . " ?$query ", $content ? Data::Dump::dump($content) : '');
 
-	if ( $cacheKey && (my $cached = $cache->get($cacheKey)) ) {
-		main::INFOLOG && $log->is_info && $log->info("returning from cache $cacheKey");
-		return $cb->($cached);
-	}
+    if (!$nocache && $cacheKey && (my $cached = $cache->get($cacheKey))) {
+        main::INFOLOG && $log->is_info && $log->info("returning from cache $cacheKey");
+        return $cb->($cached);
+    }
 
-	Slim::Networking::SimpleAsyncHTTP->new(
-		sub {
-			my $result = eval { from_json($_[0]->content) };
+    # Make the request
+    Slim::Networking::SimpleAsyncHTTP->new(
+        sub {
+            my $result = eval { from_json($_[0]->content) };
 
-			$@ && $log->error($@);
-			$log->debug(Data::Dump::dump($result)) if $@ || (main::DEBUGLOG && $log->is_debug);
+            $@ && $log->error($@);
+            $log->debug(Data::Dump::dump($result)) if $@ || (main::DEBUGLOG && $log->is_debug);
 
-			$cache->set($cacheKey, $result, $ttl) if $cacheKey;
-			$cb->($result);
-		},
-		sub {
-			my ($http, $error) = @_;
-			$log->warn("Error: $error");
-			main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($http));
-			$cb->();
-		},
-	)->$method(GURL . "?$query", %headers, $content);
+            $cache->set($cacheKey, $result, $ttl) if $cacheKey && !$nocache;
+            $cb->($result);
+        },
+        sub {
+            my ($http, $error) = @_;
+            $log->warn("Error: $error");
+            main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($http));
+            $cb->();
+        },
+    )->$method(GURL . "?$query", %headers, $content);
 }
+
 
 =comment
 sub _gwPost {
