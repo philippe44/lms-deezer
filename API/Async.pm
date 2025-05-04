@@ -46,6 +46,8 @@ my %apiClients;
 my %contexts;
 my $tzOffset = tz_local_offset();
 
+my %userCookieJars;  # Hash to store user-specific cookie jars
+
 use constant PAGE_SIZE => 50;
 
 sub init {
@@ -814,6 +816,13 @@ sub gwCall {
 	my ($self, $cb, $args, $content) = @_;
 	my $context = $contexts{$self->userId};
 	
+	# Debug-Output for context
+	$log->error("CONTEXT DEBUG: User " . $self->userId . " context: " . Data::Dump::dump($context));
+
+	# Use the user-specific cookie jar
+	if ($userCookieJars{$self->userId}) {
+	local $Slim::Networking::Async::HTTP::cookieJar = $userCookieJars{$self->userId};}
+
 	# we need to acquire an SID
 	return $self->_ajax( sub {
 		my $result = shift;
@@ -862,17 +871,33 @@ sub gwCall {
 sub getUserFromARL {
 	my ($cb, $arl) = @_;
 
+    # Clear the cookie jar before making the request
+    Slim::Networking::Async::HTTP::cookie_jar->clear();
+
 	my $params = {
 		method => 'deezer.getUserData',
 		_cookies => { arl => $arl },
+		_nocache => 1,  # Force no caching
 	};
 
 	__PACKAGE__->_ajax( sub {
 		my $result = shift;
-		my $user = {
+
+	# Debug output to see what we're getting
+	main::DEBUGLOG && $log->is_debug && $log->debug("getUserFromARL response: " . Data::Dump::dump($result));
+
+	my $user = {};
+	if ($result && $result->{results} && $result->{results}->{USER}) {
+		$user = {
 			id => $result->{results}->{USER}->{USER_ID},
 			name => $result->{results}->{USER}->{BLOG_NAME},
 		};
+
+		main::INFOLOG && $log->is_info && $log->info("Got user data for: $user->{name} (ID: $user->{id})");
+	} else {
+		$log->error("Failed to get user data from ARL");
+		main::DEBUGLOG && $log->is_debug && $log->debug("Response: " . Data::Dump::dump($result));
+	}
 
 		$cb->($user);
 	}, $params );
@@ -882,11 +907,26 @@ sub _ajax {
 	my ($self, $cb, $params, $content) = @_;
 
 	my $cookies = delete $params->{_cookies};
+
+	# Debug-Output to show used cookie
+	if ($cookies) {
+	my $userId = ref $self ? $self->userId : "unknown";
+	$log->error("COOKIE DEBUG: User $userId using cookies: " . Data::Dump::dump($cookies));
+	}
 	my $cacheKey = 'deezer_ajax_' . delete $params->{_cacheKey} if $params->{_cacheKey};
 	my $ttl = delete $params->{_ttl} || USER_CONTENT_TTL;
+	my $nocache = delete $params->{_nocache};
 	my %headers = ( 'Content-Type' => delete $params->{_contentType} || 'application/x-www-form-urlencoded' );
-	$headers{Cookie} = join ' ', map { "$_=$cookies->{$_}" } keys %$cookies if $cookies;
 	
+	# Clear the cookie jar before making the request
+	Slim::Networking::Async::HTTP::cookie_jar->clear();
+
+	# Build cookie header manually
+	if ($cookies) {
+		$headers{Cookie} = join '; ', map { "$_=$cookies->{$_}" } keys %$cookies;
+		main::DEBUGLOG && $log->is_debug && $log->debug("Setting cookies: $headers{Cookie}");
+	}
+
 	# TODO
 	# LMS memorizes all cookies so it can keep SID and we don't want that...
 	# but if we clean the cookie jar every time, then SID is lost and it is needed between calls. That means
@@ -903,14 +943,18 @@ sub _ajax {
 		api_version => '1.0',
 	} );
 
+	# Add a unique parameter to prevent caching by the server
+	$query .= "&_nocache=" . time() if $nocache;
+
 	my $method = $content ? 'post' : 'get';
 	main::INFOLOG && $log->is_info && $log->info(uc($method) . " ?$query ", $content ? Data::Dump::dump($content) : '');
 
-	if ( $cacheKey && (my $cached = $cache->get($cacheKey)) ) {
+	if (!$nocache && $cacheKey && (my $cached = $cache->get($cacheKey))) {
 		main::INFOLOG && $log->is_info && $log->info("returning from cache $cacheKey");
 		return $cb->($cached);
 	}
 
+	# Make the request
 	Slim::Networking::SimpleAsyncHTTP->new(
 		sub {
 			my $result = eval { from_json($_[0]->content) };
@@ -918,7 +962,7 @@ sub _ajax {
 			$@ && $log->error($@);
 			$log->debug(Data::Dump::dump($result)) if $@ || (main::DEBUGLOG && $log->is_debug);
 
-			$cache->set($cacheKey, $result, $ttl) if $cacheKey;
+			$cache->set($cacheKey, $result, $ttl) if $cacheKey && !$nocache;
 			$cb->($result);
 		},
 		sub {
