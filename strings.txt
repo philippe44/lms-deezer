@@ -7,6 +7,7 @@ PLUGIN_DEEZER_DESC
 	EN	Deezer Plugin for LMS, does not depend on MySqueezebox.com.
 	FR	Plugin Deezer pour LMS (sans lien avec MySqueezebox.com).
 	HU	Deezer Plugin for LMS, nem függ a MySqueezebox.com webhelytől.
+	UA	Плагін Deezer для LMS, не залежить від MySqueezebox.com.
 
 PLUGIN_DEEZER_REGISTER
 	DA	Klik "Tilføj Konto" for at åbne en Deezer login side og tillad udvidelsesmodulet
@@ -25,6 +26,8 @@ PLUGIN_DEEZER_REGISTER
 	HU	Kattintson a "Fiók hozzáadása" gombra a Deezer bejelentkezési oldal megnyitásához, és engedélyezze a beépülő modul hozzáférését
 	HU	a fiókjához. Az ARL-token szükséges, és használhatja a Google-t, a YouTube-ot vagy a Reddit-et,
 	HU	a beszerzéséhez. <br>FIGYELEM: CSAK PREMIUM FIÓKKAL HASZNÁLHATÓ
+	UA	Натисніть "Додати обліковий запис", щоб відкрити сторінку входу Deezer і дозволити плагіну доступ до вашого акаунта.
+	UA	Потрібен ARL токен, знайти його можна за допомогою Google, YouTube або Reddit. <br>ЗВЕРНІТЬ УВАГУ, ЩО МОЖНА ВИКОРИСТОВУВАТИ ЛИШЕ PREMIUM-АКАУНТ
 
 PLUGIN_DEEZER_AUTH_FAILED
 	DA	Autorisation mislykkedes, eller ingen Premium konto.
@@ -32,12 +35,14 @@ PLUGIN_DEEZER_AUTH_FAILED
 	EN	Authorization failed, or no Premium account.
 	FR	Échec d'autorisation, ou compte non Premium.
 	HU	Az engedélyezés nem sikerült, vagy nincs Premium-fiók.
+	UA	Авторизація не вдалася, або немає Premium-акаунта.
 
 PLUGIN_DEEZER_ADD_ACCOUNT
 	DA	Tilføj/Opdatér
 	EN	Add/Refresh
 	FR	Ajouter/Rafraichir
 	HU	Hozzáadás/Frissítés
+	UA	Додати/Оновити
 
 PLUGIN_DEEZER_AUTH
 	CS	Autorizace Deezer
@@ -48,6 +53,7 @@ PLUGIN_DEEZER_AUTH
 	HU	Deezer hitelesítés
 	NL	Deezer Autorisatie
 	IT	Autorizza Deezer
+	UA	Авторизація Deezer
 
 PLUGIN_DEEZER_IMPORT_LIBRARY
 	CS	Importovat
@@ -58,6 +64,7 @@ PLUGIN_DEEZER_IMPORT_LIBRARY
 	HU	Import
 	IT	Import
 	NL	Importeren
+	UA	Імпорт
 
 PLUGIN_DEEZER_ACCOUNT
 	CS	Účet
@@ -74,6 +81,7 @@ PLUGIN_DEEZER_ACCOUNT
 	PL	Konto
 	RU	Учетная запись
 	SV	Konto
+	UA	Акаунт
 
 PLUGIN_DEEZER_FOLLOW_LINK
 	DA	Det efterfølgende link tager dig til Deezer for at autorisere. Her skal du give Logitech Media Server adgang til din Deezer konto. Efter du er logget på, så kom tilbage hertil:
@@ -82,6 +90,7 @@ PLUGIN_DEEZER_FOLLOW_LINK
 	FR	Le lien suivant vous mènera à Deezer pour authentification. Veuillez le suivre pour accorder à Logitech Media Server l'accès à votre compte Deezer. Une fois votre inscription terminée, revenez ici :
 	HU	A következő link a Deezerhez visz hitelesítéshez. Kérjük, kövesse a Logitech Media Server hozzáférést a Deezer-fiókjához. Miután befejezte a bejelentkezést, térjen vissza ide:
 	IT	Il seguente link reindirizza all'autenticazione di Deezer. Per favore, garantisci l'accesso al tuo account Deezer a Logitech Media Server e torna in questa pagina una volta completato il login.
+	UA	Наступне посилання перенаправить вас на Deezer для авторизації. Будь ласка, дозвольте Logitech Media Server доступ до вашого акаунта Deezer. Після входу поверніться сюди:
 
 PLUGIN_DEEZER_REQUIRES_CREDENTIALS
 	DA	Gå til Indstillinger/advanced/Deezer for at autorisere med Deezer
@@ -90,6 +99,7 @@ PLUGIN_DEEZER_REQUIRES_CREDENTIALS
 	FR	Veuillez vous connecter à Deezer en accédant aux réglages du plugin Deezer (paramètres/avancé/Deezer ou préférences/serveur/Deezer).
 	HU	A Deezerrel való hitelesítéshez lépjen a Beállítások/Speciális/Deezer menüpontba.
 	IT	Per autenticarti con Deezer, vai a Impostazioni/Avanzate/Deezer
+	UA	Перейдіть у Налаштування/Додатково/Deezer для авторизації через Deezer
 
 PLUGIN_DEEZER_SELECT_ACCOUNT
 	CS	Zvolení účtu
@@ -106,6 +116,7 @@ PLUGIN_DEEZER_SELECT_ACCOUNT
 	PL	Wybierz konto w usłudze
 	RU	Выберите учетную запись
 	SV	Välj konto
+	UA	Виберіть акаунт
 
 PLUGIN_DEEZER_QUALITY
 	DA	Kvalitet
@@ -114,6 +125,7 @@ PLUGIN_DEEZER_QUALITY
 	FR	Qualité
 	HU	Minőség
 	IT	Qualità
+	UA	Якість
 
 PLUGIN_DEEZER_QUALITY_DESC
 	DA	Streaming kvalitet
@@ -122,6 +134,7 @@ PLUGIN_DEEZER_QUALITY_DESC
 	FR	Qualité du streaming
 	HU	Streaming minőség
 	IT	Qualità dello streaming
+	UA	Якість трансляції
 
 PLUGIN_DEEZER_MOODS
 	DA	Stemninger
@@ -130,12 +143,14 @@ PLUGIN_DEEZER_MOODS
 	FR	Ambiances
 	HU	Hangulatok
 	IT	Moods
+	UA	Настрої
 
 PLUGIN_DEEZER_CHART
 	DA	Hitlister
 	EN	Charts
 	FR	Tops
 	HU	Diagramok
+	UA	Чарти
 
 PLUGIN_DEEZER_ALBUMS_PROGRESS
 	CS	Alba Deezeru
@@ -146,6 +161,7 @@ PLUGIN_DEEZER_ALBUMS_PROGRESS
 	HU	Deezer albumok
 	IT	Deezer Albums
 	NL	Deezer Albums
+	UA	Альбоми Deezer
 
 PLUGIN_DEEZER_PROGRESS_READ_ALBUMS
 	CS	Načítání alb (%s)...
@@ -156,6 +172,7 @@ PLUGIN_DEEZER_PROGRESS_READ_ALBUMS
 	HU	Albumok lekérése (%s)...
 	IT	Recupero gli album (%s)...
 	NL	Albums ophalen (%s)...
+	UA	Завантаження альбомів (%s)...
 
 PLUGIN_DEEZER_ARTISTS_PROGRESS
 	CS	Interpeti Deezeru
@@ -166,6 +183,7 @@ PLUGIN_DEEZER_ARTISTS_PROGRESS
 	HU	Deezer előadók
 	IT	Deezer Artist
 	NL	Deezer Artiesten
+	UA	Виконавці Deezer
 
 PLUGIN_DEEZER_PROGRESS_READ_ARTISTS
 	CS	Načítání interpetů (%s)...
@@ -176,6 +194,7 @@ PLUGIN_DEEZER_PROGRESS_READ_ARTISTS
 	HU	Előadók (%s) lekérése...
 	IT	Recupero gli artisti (%s)...
 	NL	Artiesten ophalen (%s)...
+	UA	Завантаження виконавців (%s)...
 
 PLUGIN_DEEZER_PLAYLISTS_PROGRESS
 	CS	Seznamy skladeb Deezeru
@@ -186,6 +205,7 @@ PLUGIN_DEEZER_PLAYLISTS_PROGRESS
 	HU	Deezer lejátszási listák
 	IT	Deezer Playlists
 	NL	Deezer Afspeellijsten
+	UA	Плейлисти Deezer
 
 PLUGIN_DEEZER_PROGRESS_READ_PLAYLISTS
 	CS	Získávání seznamů skladeb (%s)...
@@ -196,6 +216,7 @@ PLUGIN_DEEZER_PROGRESS_READ_PLAYLISTS
 	HU	Lejátszási listák (%s) lekérése...
 	IT	Recupero le playlists (%s)...
 	NL	Afspeellijsten ophalen (%s)...
+	UA	Завантаження плейлистів (%s)...
 
 PLUGIN_DEEZER_TOP_TRACKS
 	CS	Nejlepší skladby
@@ -212,6 +233,7 @@ PLUGIN_DEEZER_TOP_TRACKS
 	PL	Najczęściej słuchane
 	RU	Лучшие дорожки
 	SV	Toppspår
+	UA	Топ треки
 
 PLUGIN_DEEZER_ARL_TOKEN
 	DA	ARL token
@@ -219,6 +241,7 @@ PLUGIN_DEEZER_ARL_TOKEN
 	EN	ARL token
 	FR	Jeton ARL
 	HU	ARL token
+	UA	ARL токен
 
 PLUGIN_DEEZER_RELATED
 	DA	Beslægtede
@@ -226,22 +249,26 @@ PLUGIN_DEEZER_RELATED
 	EN	Related
 	FR	Artistes similaires
 	HU	Kapcsolódó
+	UA	Схожі
 
 PLUGIN_DEEZER_SMART_RADIO
 	EN	Smart Radio
 	FR	Radio Intelligente
 	HU	Okos rádió
-	
+	UA	Смарт-радіо
 
 PLUGIN_DEEZER_FLOW
 	EN	Flow
+	UA	Flow
 
 PLUGIN_DEEZER_DSTM_SMART_RADIO
 	EN	Deezer Smart Radio
 	HU	Deezer Smart Radio
+	UA	Deezer Smart Radio
 
 PLUGIN_DEEZER_DSTM_FLOW
 	EN	Deezer Flow
+	UA	Deezer Flow
 
 PLUGIN_DEEZER_ON_DEEZER
 	DA	På Deezer
@@ -249,28 +276,35 @@ PLUGIN_DEEZER_ON_DEEZER
 	EN	On Deezer
 	FR	Sur Deezer
 	HU	Deezeren
+	UA	У Deezer
 
 PLUGIN_DEEZER_POP
 	EN	Pop
+	UA	Поп
 
 PLUGIN_DEEZER_ROCK
 	EN	Rock
+	UA	Рок
 
 PLUGIN_DEEZER_RAP
 	EN	Rap
+	UA	Реп
 
 PLUGIN_DEEZER_ALTERNATIVE
 	DA	Indie & Alternativ
 	EN	Alternative
 	FR	Indie & Alternative
 	HU	Alternatív
+	UA	Альтернатива
 
 PLUGIN_DEEZER_KPOP
 	DA	Koreansk pop (K-Pop)
 	EN	K-Pop
+	UA	K-Pop
 
 PLUGIN_DEEZER_JAZZ
 	EN	Jazz
+	UA	Джаз
 
 PLUGIN_DEEZER_CLASSICAL
 	DA	Klassisk musik
@@ -278,6 +312,7 @@ PLUGIN_DEEZER_CLASSICAL
 	EN	Classical
 	FR	Classique
 	HU	Klasszikus
+	UA	Класика
 
 PLUGIN_DEEZER_CHANSON
 	DA	Sange
@@ -285,18 +320,22 @@ PLUGIN_DEEZER_CHANSON
 	EN	Songs
 	FR	Chansons
 	HU	Sanzon
+	UA	Пісні
 
 PLUGIN_DEEZER_REGGAE
 	EN	Reggae
+	UA	Реггі
 
 PLUGIN_DEEZER_LATIN
 	EN	Latin
 	FR	Latino
 	HU	Latin
+	UA	Латино
 
 PLUGIN_DEEZER_SOUL
 	EN	Soul
 	FR	Soul & Funk
+	UA	Соул
 
 PLUGIN_DEEZER_VARIETE
 	DA	Fransk pop
@@ -304,42 +343,50 @@ PLUGIN_DEEZER_VARIETE
 	EN	French Pop
 	FR	Variété française
 	HU	Francia Pop
+	UA	Французький поп
 
 PLUGIN_DEEZER_LOFI
 	DA	Low-Fidelity
 	EN	LoFi
 	FR	Lofi
+	UA	LoFi
 
 PLUGIN_DEEZER_RNB
 	DA	Rhythm & Blues
 	EN	R&B
+	UA	R&B
 
 PLUGIN_DEEZER_DANCEEDM
 	DA	Dance & Elektronisk (EDM)
 	EN	Dance & EDM
+	UA	Танцювальна та EDM
 
 PLUGIN_DEEZER_MOTIVATION
 	DA	Workout
 	DE	Workout
 	EN	Motivation
 	HU	Motiváció
+	UA	Мотивація
 
 PLUGIN_DEEZER_PARTY
 	DA	Fest
 	EN	Party
 	FR	Soirée
 	HU	Parti
+	UA	Вечірка
 
 PLUGIN_DEEZER_CHILL
 	DA	Afslappende
 	EN	Chill
 	FR	Détente
+	UA	Чіл
 
 PLUGIN_DEEZER_MELANCHOLY
 	DA	Vemodig
 	DE	Traurig
 	EN	Melancholy
 	FR	Mélancolie
+	UA	Меланхолія
 
 PLUGIN_DEEZER_YOU_AND_ME
 	DA	Romantisk
@@ -347,6 +394,7 @@ PLUGIN_DEEZER_YOU_AND_ME
 	EN	Love
 	FR	Romance
 	HU	Szerelem
+	UA	Кохання
 
 PLUGIN_DEEZER_FOCUS
 	DA	Fokus
@@ -354,18 +402,22 @@ PLUGIN_DEEZER_FOCUS
 	EN	Focus
 	FR	Concentration
 	HU	Koncentráció
+	UA	Фокус
 
 PLUGIN_DEEZER_EMPOWERMENT
 	DA	Bekræftende (Empowerment)
 	EN	Girl Power
+	UA	Сила дівчат
 
 PLUGIN_DEEZER_DSTM_SMART_RADIO
 	EN	Deezer Smart Radio
 	FR	Radio Intelligente Deezer
 	HU	Deezer Smart Radio
+	UA	Deezer Smart Radio
 
 PLUGIN_DEEZER_DSTM_FLOW
 	EN	Deezer Flow
+	UA	Deezer Flow
 
 PLUGIN_DEEZER_ADD_TO_FAVORITES
 	DA	Tilføj til Deezer favoritter
@@ -373,6 +425,7 @@ PLUGIN_DEEZER_ADD_TO_FAVORITES
 	EN	Add to Deezer favorites
 	FR	Ajouter aux favoris Deezer
 	HU	Add hozzá a Deezer kedvenceihez
+	UA	Додати до улюбленого Deezer
 
 PLUGIN_DEEZER_REMOVE_FROM_FAVORITES
 	DA	Slet fra Deezer favoritter
@@ -380,6 +433,7 @@ PLUGIN_DEEZER_REMOVE_FROM_FAVORITES
 	EN	Remove from Deezer favorites
 	FR	Supprimer des favoris Deezer
 	HU	Eltávolítás a Deezer kedvencei közül
+	UA	Видалити з улюбленого Deezer
 
 PLUGIN_DEEZER_ADD_TO_PLAYLIST
 	DA	Tilføj til en Deezer afspilleliste
@@ -387,6 +441,7 @@ PLUGIN_DEEZER_ADD_TO_PLAYLIST
 	EN	Add to a Deezer playlist
 	FR	Ajouter à une liste de lecture Deezer
 	HU	Hozzáadás a Deezer lejátszási listához
+	UA	Додати до плейлиста Deezer
 
 PLUGIN_DEEZER_REMOVE_FROM_PLAYLIST
 	DA	Slet fra denne afspilleliste
@@ -394,6 +449,7 @@ PLUGIN_DEEZER_REMOVE_FROM_PLAYLIST
 	EN	Remove from this playlist
 	FR	Supprimer de cette liste de lecture
 	HU	Eltávolítás erről a lejátszási listáról
+	UA	Видалити з цього плейлиста
 
 PLUGIN_DEEZER_LIVE_PARAMS
 	DA	Parametre for livestreaming
@@ -401,6 +457,7 @@ PLUGIN_DEEZER_LIVE_PARAMS
 	EN	Live streaming parameters
 	FR	Paramètres streaming en direct
 	HU	Élő közvetítés paraméterei
+	UA	Параметри прямої трансляції
 
 PLUGIN_DEEZER_LIVE_PARAMS_DESC
 	DA	Angiv minimum bitrate og ønsket format til livestreaming. Nærmeste tilgængelige vil blive valgt
@@ -408,6 +465,7 @@ PLUGIN_DEEZER_LIVE_PARAMS_DESC
 	EN	Specify minimum bitrate and desired format for live streaming. Closest available will be selected
 	FR	Spécifie le débit minimum et le format désiré pour le streaming en direct. Le plus proche sera sélectionné
 	HU	Adja meg a minimális bitsebességet és a kívánt formátumot az élő közvetítéshez. A legközelebbi elérhető lesz kiválasztva
+	UA	Вкажіть мінімальний бітрейт і бажаний формат для прямої трансляції. Буде вибрано найближчий доступний
 
 PLUGIN_DEEZER_CHANNELS
 	DA	Kanaler
@@ -415,6 +473,7 @@ PLUGIN_DEEZER_CHANNELS
 	EN	Channels
 	FR	Canaux
 	HU	Channels
+	UA	Канали
 
 PLUGIN_DEEZER_EPISODES
 	DA	Afsnit
@@ -422,6 +481,7 @@ PLUGIN_DEEZER_EPISODES
 	EN	Episodes
 	FR	Épisodes
 	HU	Epizódok
+	UA	Епізоди
 
 PLUGIN_DEEZER_FLOW_DEFAULT
 	DA	Favoritter flow modus
@@ -429,6 +489,7 @@ PLUGIN_DEEZER_FLOW_DEFAULT
 	EN	Favorites Flow mode
 	FR	Mode Flow favoris
 	HU	Kedvencek Flow mód
+	UA	Режим Flow улюбленого
 
 PLUGIN_DEEZER_FLOW_DISCOVERY
 	DA	Discovery flow-tilstand
@@ -436,6 +497,7 @@ PLUGIN_DEEZER_FLOW_DISCOVERY
 	EN	Discovery Flow mode
 	FR	Mode Flow découverte
 	HU	Discovery Flow mód
+	UA	Режим Flow відкриттів
 
 PLUGIN_DEEZER_DISLIKE_TITLE
 	DA	Kan ikke lide titlen 
@@ -443,6 +505,7 @@ PLUGIN_DEEZER_DISLIKE_TITLE
 	EN	Dislike this title
 	FR	Ne pas aimer cette chanson
 	HU	Nem tetszik ez a cím
+	UA	Не подобається ця композиція
 
 PLUGIN_DEEZER_DISLIKE_ARTIST
 	DA	Kan ikke lide kunstneren
@@ -450,6 +513,7 @@ PLUGIN_DEEZER_DISLIKE_ARTIST
 	EN	Dislike this artist
 	FR	Ne pas aimer cet(te) artiste
 	HU	Nem tetszik ez az előadó
+	UA	Не подобається цей виконавець
 
 PLUGIN_DEEZER_EXPLORE
 	DA	Udforske
@@ -457,6 +521,7 @@ PLUGIN_DEEZER_EXPLORE
 	EN	Explore
 	FR	Explorer
 	HU	Felfedezés
+	UA	Досліджувати
 
 PLUGIN_DEEZER_HISTORY
 	DA	Historik for lytning
@@ -464,6 +529,7 @@ PLUGIN_DEEZER_HISTORY
 	EN	Listening History
 	FR	Historique d'écoute
 	HU	Lejátszás előzmények
+	UA	Історія прослуховувань
 
 PLUGIN_DEEZER_PERSONAL
 	DA	Personligt bibliotek
@@ -471,6 +537,7 @@ PLUGIN_DEEZER_PERSONAL
 	EN	Personal library
 	FR	Bibliothèque personnelle
 	HU	Személyes könyvtár
+	UA	Особиста бібліотека
 
 PLUGIN_DEEZER_COLLECTION
 	DA	Mit bibliotek
@@ -478,6 +545,7 @@ PLUGIN_DEEZER_COLLECTION
 	EN	My collection
 	FR	Ma collection
 	HU	Saját gyűjtemény
+	UA	Моя колекція
 
 PLUGIN_DEEZER_UNFOLD
 	DA	Udfold biblioteksmenu
@@ -485,6 +553,7 @@ PLUGIN_DEEZER_UNFOLD
 	EN	Unfold collection menu
 	FR	Dérouler le menu collection
 	HU	Nyissa ki a gyűjtemény menüjét
+	UA	Розгорнути меню колекції
 
 PLUGIN_DEEZER_UNFOLD_DESC
 	DA	Definér udfoldningsmodus for din biblioteksmenu
@@ -492,3 +561,4 @@ PLUGIN_DEEZER_UNFOLD_DESC
 	EN	Set the folding mode of your collection's menu
 	FR	Configure le déroulement du menu de votre collection
 	HU	Állítsa be a gyűjtemény menüjének összehajtási módját
+	UA	Встановіть режим згортання меню вашої колекції
