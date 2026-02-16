@@ -16,6 +16,8 @@ use Slim::Utils::Strings qw(string);
 
 use Plugins::Deezer::API qw(AURL BURL);
 
+use constant DESKTOP_BROWSER => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
 my $cache = Slim::Utils::Cache->new();
 my $log = logger('plugin.deezer');
 my $prefs = preferences('plugin.deezer');
@@ -38,7 +40,7 @@ sub init {
 }
 
 sub _getCBC {
-		Slim::Networking::SimpleAsyncHTTP->new(
+	Slim::Networking::SimpleAsyncHTTP->new(
 		sub {
 			my ($url) = shift->content =~ /<script src=\"(https:\/\/[a-z-.\/]+app-web[a-z0-9.]+).*<\/script>/;
 			Slim::Networking::SimpleAsyncHTTP->new(
@@ -67,7 +69,7 @@ sub _getCBC {
 			$log->warn("Fail to get jumpstart ($_[1]), retrying in $cbcRetry sec");
 			$cbcRetry *= 2;
 		}
-	)->get('https://www.deezer.com/en/channels/explore');
+	)->get('https://www.deezer.com/en/channels/explore', 'User-Agent' => DESKTOP_BROWSER);
 }
 
 sub authRegister {
