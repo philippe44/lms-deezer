@@ -441,7 +441,9 @@ sub playlistTracks {
 
 		if ($result) {
 			$items = Plugins::Deezer::API->cacheTrackMetadata([ grep {
-				$_->{type} && $_->{type} eq 'track' && $_->{readable}
+				($_->{type} && $_->{type} eq 'track' && $_->{readable}) ||
+				# allow user-uploaded tracks (identified by negative IDs)
+				(defined $_->{id} && $_->{id} < 0)
 			} @{$result->{data} || []} ]);
 
 			$cache->remove($cacheKey) if $refresh;
