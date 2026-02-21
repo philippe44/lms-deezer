@@ -871,6 +871,7 @@ sub getUserFromARL {
 
 	__PACKAGE__->_ajax( sub {
 		my $result = shift;
+		return $cb->({}) unless $result && $result->{results}->{USER}->{USER_ID};
 		my $user = {
 			id => $result->{results}->{USER}->{USER_ID},
 			name => $result->{results}->{USER}->{BLOG_NAME},
@@ -887,15 +888,15 @@ sub _ajax {
 	my $cacheKey = 'deezer_ajax_' . delete $params->{_cacheKey} if $params->{_cacheKey};
 	my $ttl = delete $params->{_ttl} || USER_CONTENT_TTL;
 	my %headers = ( 'Content-Type' => delete $params->{_contentType} || 'application/x-www-form-urlencoded' );
-	$headers{Cookie} = join ' ', map { "$_=$cookies->{$_}" } keys %$cookies if $cookies;
-	
-	# TODO
-	# LMS memorizes all cookies so it can keep SID and we don't want that...
-	# but if we clean the cookie jar every time, then SID is lost and it is needed between calls. That means
-	# that current logic does not work, and ARL should be given once then only SID should be used until it expires.
-	# For now, we'll ignore that and this is an issue only when adding/refreshing a user if a wrong arl is given
-	# or for users with multiple profiles assigned to different players
-	# Slim::Networking::Async::HTTP::cookie_jar->clear('.deezer.com');
+	$headers{Cookie} = join '; ', map { "$_=$cookies->{$_}" } keys %$cookies if $cookies;
+
+	# ARL and SID are always set explicitly in the Cookie header above.
+	# We must clear any cookies LMS has stored for deezer.com from previous requests,
+	# otherwise the cookie jar would append stale cookies (wrong user's arl/sid) to our request.
+	# This is safe because all session state is managed explicitly in %contexts.
+	if (my $jar = Slim::Networking::Async::HTTP::cookie_jar()) {
+		$jar->clear('.deezer.com');
+	}
 
 	$params->{api_token} ||= 'null';
 

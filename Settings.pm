@@ -44,6 +44,7 @@ sub handler {
 				);
 				$accounts->{$userId} = \%account;
 				$prefs->set('accounts', $accounts);
+				Plugins::Deezer::API::Async::refreshArl($userId);
 			} else {
 				$params->{'warning'} = Slim::Utils::Strings::string('PLUGIN_DEEZER_AUTH_FAILED');
 				$log->error("Unable to add /refresh user with ARL $arl");
