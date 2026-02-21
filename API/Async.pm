@@ -890,10 +890,10 @@ sub _ajax {
 	my %headers = ( 'Content-Type' => delete $params->{_contentType} || 'application/x-www-form-urlencoded' );
 	$headers{Cookie} = join '; ', map { "$_=$cookies->{$_}" } keys %$cookies if $cookies;
 
-	# ARL and SID are always set explicitly in the Cookie header above.
-	# We must clear any cookies LMS has stored for deezer.com from previous requests,
-	# otherwise the cookie jar would append stale cookies (wrong user's arl/sid) to our request.
-	# This is safe because all session state is managed explicitly in %contexts.
+	# ARL and SID are always set explicitly in the Cookie header above and never read
+	# back from the jar - ARL comes from %contexts (set by refreshArl) and SID from
+	# $context->{sid} (set by gwCall). Clearing the jar before each request prevents
+	# LMS from appending stale cookies from a previous user's session alongside ours.
 	if (my $jar = Slim::Networking::Async::HTTP::cookie_jar()) {
 		$jar->clear('.deezer.com');
 	}
