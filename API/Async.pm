@@ -235,6 +235,9 @@ sub flowTracks {
 	
 	$self->gwCall( sub {
 		my ($result, $context) = @_;
+		# When a track has an empty RIGHTS hash it cannot be streamed (error 2002).
+		# Deezer then provides a FALLBACK entry with a licensed alternative version
+		# (different SNG_ID/TRACK_TOKEN) and populated RIGHTS - use that instead.
 		my @trackTokens = map {
 			my $t = ($_->{RIGHTS} && %{$_->{RIGHTS}}) ? $_ : ($_->{FALLBACK} || $_);
 			$t->{TRACK_TOKEN};
@@ -722,6 +725,9 @@ sub getTrackUrl {
 	
 	$self->gwCall( sub {
 		my ($result, $context) = @_;
+		# When a track has an empty RIGHTS hash it cannot be streamed (error 2002).
+		# Deezer then provides a FALLBACK entry with a licensed alternative version
+		# (different SNG_ID/TRACK_TOKEN) and populated RIGHTS - use that instead.
 		my @trackTokens = map {
 			my $t = ($_->{RIGHTS} && %{$_->{RIGHTS}}) ? $_ : ($_->{FALLBACK} || $_);
 			$t->{TRACK_TOKEN};
