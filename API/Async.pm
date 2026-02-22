@@ -289,10 +289,13 @@ sub albumTracks {
 			# provided. User-uploaded tracks (negative IDs) bypass licensing entirely.
 			my $total = $tracks ? scalar @$tracks : 0;
 
-			# Step 1: filter readable:false and already-known-norights tracks
+			# Step 1: filter readable:false and already-known-norights tracks.
+			# The norights cache is only consulted when check_track_rights is
+			# enabled; disabling the option restores all tracks to visibility.
+			my $checkRights = $prefs->get('check_track_rights');
 			$tracks = [grep {
 				($_->{readable} || (defined $_->{id} && $_->{id} < 0)) &&
-				!$cache->get("deezer_track_norights_$_->{id}")
+				(!$checkRights || !$cache->get("deezer_track_norights_$_->{id}"))
 			} @$tracks] if $tracks;
 
 			my $finish = sub {
@@ -306,7 +309,7 @@ sub albumTracks {
 			# Step 2: if check_track_rights is enabled and this album has not been
 			# rights-checked yet, call song.getListData to find remaining unplayable
 			# tracks and cache them (TTL from rights_cache_ttl pref).
-			if ($prefs->get('check_track_rights') && $tracks && @$tracks
+			if ($checkRights && $tracks && @$tracks
 					&& !$cache->get("deezer_album_rights_$id")) {
 				my @ids = map { $_->{id} } @$tracks;
 				$self->gwCall(sub {
