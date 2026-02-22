@@ -280,9 +280,55 @@ sub albumTracks {
 			my $tracks = shift;
 			$tracks = $tracks->{data} if $tracks;
 			# only missing data in album/tracks is the album itself...
-			$tracks = Plugins::Deezer::API->cacheTrackMetadata( $tracks, { album => $album } ) if $tracks;
+			# Deezer sets readable:false for tracks not licensed in the user's region or
+			# subscription. Queuing them causes error 2002 for every track. Filter them
+			# out here, consistent with playlistTracks. This is independent from the
+			# FALLBACK mechanism in getTrackUrl/flowTracks: FALLBACK handles tracks that
+			# are listed as readable but fail at playback time with an alternative version;
+			# readable:false means the track is genuinely unavailable and no FALLBACK is
+			# provided. User-uploaded tracks (negative IDs) bypass licensing entirely.
+			my $total = $tracks ? scalar @$tracks : 0;
 
-			$cb->($tracks || []);
+			# Step 1: filter readable:false and already-known-norights tracks
+			$tracks = [grep {
+				($_->{readable} || (defined $_->{id} && $_->{id} < 0)) &&
+				!$cache->get("deezer_track_norights_$_->{id}")
+			} @$tracks] if $tracks;
+
+			my $finish = sub {
+				my $filtered = shift;
+				$filtered = Plugins::Deezer::API->cacheTrackMetadata($filtered, { album => $album });
+				my $kept = $filtered ? scalar @$filtered : 0;
+				$log->info("albumTracks id=$id: $total total, $kept kept after filter");
+				$cb->($filtered || []);
+			};
+
+			# Step 2: if check_track_rights is enabled and this album has not been
+			# rights-checked yet, call song.getListData to find remaining unplayable
+			# tracks and cache them (TTL from rights_cache_ttl pref).
+			if ($prefs->get('check_track_rights') && $tracks && @$tracks
+					&& !$cache->get("deezer_album_rights_$id")) {
+				my @ids = map { $_->{id} } @$tracks;
+				$self->gwCall(sub {
+					my ($result) = @_;
+					my $ttl = ($prefs->get('rights_cache_ttl') || 24) * 3600;
+					my %unplayable;
+					foreach my $t (@{ $result->{results}->{data} || [] }) {
+						if (!($t->{RIGHTS} && %{$t->{RIGHTS}}) && !$t->{FALLBACK}) {
+							$unplayable{$t->{SNG_ID}} = 1;
+							$cache->set("deezer_track_norights_$t->{SNG_ID}", 1, $ttl);
+						}
+					}
+					$cache->set("deezer_album_rights_$id", 1, $ttl);
+					$finish->([grep { !$unplayable{$_->{id}} } @$tracks]);
+				}, {
+					method => 'song.getListData',
+				}, {
+					sng_ids => \@ids,
+				});
+			} else {
+				$finish->($tracks || []);
+			}
 		}, {
 			limit => MAX_LIMIT,
 		} );
@@ -720,6 +766,18 @@ sub getTrackUrl {
 		my @trackTokens = map { $_->{TRACK_TOKEN} } @{ $result->{results}->{data} };
 		my @trackIds = map { $_->{SNG_ID} } @{ $result->{results}->{data} };
 #$log->error(Data::Dump::dump(\@trackTokens), Data::Dump::dump(\@trackIds));
+
+		# Tracks with no rights AND no fallback cannot be streamed by any means.
+		# Cache their IDs so albumTracks can exclude them from future listings.
+		# Use the user-configured TTL (rights_cache_ttl, in hours).
+		my $norights_ttl = ($prefs->get('rights_cache_ttl') || 24) * 3600;
+		foreach my $track (@{ $result->{results}->{data} || [] }) {
+			if (!($track->{RIGHTS} && %{$track->{RIGHTS}}) && !$track->{FALLBACK}) {
+				$cache->set("deezer_track_norights_$track->{SNG_ID}", 1, $norights_ttl);
+				main::INFOLOG && $log->is_info && $log->info("Track $track->{SNG_ID} has no rights and no fallback, marked unplayable");
+			}
+		}
+
 
 		return $cb->() unless @trackTokens;
 
