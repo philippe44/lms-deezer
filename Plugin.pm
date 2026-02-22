@@ -515,6 +515,8 @@ sub getAlbum {
 
 	getAPIHandler($client)->albumTracks(sub {
 		my $items = _renderTracks(shift);
+		$items = [{ name => cstring($client, 'PLUGIN_DEEZER_NO_PLAYABLE_TRACKS'), type => 'textarea' }]
+			unless @$items;
 		$cb->( { items => $items } );
 	}, $params->{id} );
 }

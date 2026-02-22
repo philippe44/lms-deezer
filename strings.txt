@@ -578,3 +578,7 @@ PLUGIN_DEEZER_RIGHTS_CACHE_TTL
 PLUGIN_DEEZER_RIGHTS_CACHE_TTL_DESC
 	DE	Wie lange die Track-Verfügbarkeit gecacht wird. Nach Ablauf wird erneut geprüft.
 	EN	How long track availability is cached. After expiry the check is repeated.
+
+PLUGIN_DEEZER_NO_PLAYABLE_TRACKS
+	DE	Keine abspielbaren Tracks verfügbar. Möglicherweise sind diese Titel in deiner Region oder mit deinem Abonnement nicht lizenziert.
+	EN	No playable tracks available. These tracks may not be licensed for your region or subscription.
