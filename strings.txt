@@ -562,3 +562,19 @@ PLUGIN_DEEZER_UNFOLD_DESC
 	FR	Configure le déroulement du menu de votre collection
 	HU	Állítsa be a gyűjtemény menüjének összehajtási módját
 	UA	Встановіть режим згортання меню вашої колекції
+
+PLUGIN_DEEZER_CHECK_RIGHTS
+	DE	Verfügbarkeit beim Öffnen eines Albums prüfen
+	EN	Check track availability on album open
+
+PLUGIN_DEEZER_CHECK_RIGHTS_DESC
+	DE	Ruft beim Öffnen eines Albums die Streaming-Rechte von Deezer ab. Nicht abspielbare Tracks werden sofort ausgeblendet statt beim Abspielen zu scheitern. Beim ersten Öffnen entsteht eine kurze Verzögerung (~300ms).
+	EN	Fetches streaming rights from Deezer for all tracks when an album is opened. Unplayable tracks are hidden immediately instead of failing at playback. Adds a short delay (~300ms) the first time each album is opened.
+
+PLUGIN_DEEZER_RIGHTS_CACHE_TTL
+	DE	Cache-Dauer für Verfügbarkeit
+	EN	Availability cache duration
+
+PLUGIN_DEEZER_RIGHTS_CACHE_TTL_DESC
+	DE	Wie lange die Track-Verfügbarkeit gecacht wird. Nach Ablauf wird erneut geprüft.
+	EN	How long track availability is cached. After expiry the check is repeated.
