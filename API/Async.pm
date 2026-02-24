@@ -235,11 +235,19 @@ sub flowTracks {
 	
 	$self->gwCall( sub {
 		my ($result, $context) = @_;
-		my @trackTokens = map { $_->{TRACK_TOKEN} } @{ $result->{results}->{data} };
-		my @trackIds = map { $_->{SNG_ID} } @{ $result->{results}->{data} };
-#$log->error(Data::Dump::dump(\@trackTokens), Data::Dump::dump(\@trackIds));
+		# When a track has an empty RIGHTS hash it cannot be streamed (error 2002).
+		# Deezer then provides a FALLBACK entry with a licensed alternative version
+		# (different SNG_ID/TRACK_TOKEN) and populated RIGHTS - use that instead.
+		my @trackTokens = map {
+			my $t = ($_->{RIGHTS} && %{$_->{RIGHTS}}) ? $_ : ($_->{FALLBACK} || $_);
+			$t->{TRACK_TOKEN};
+		} @{ $result->{results}->{data} };
+		my @trackIds = map {
+			my $t = ($_->{RIGHTS} && %{$_->{RIGHTS}}) ? $_ : ($_->{FALLBACK} || $_);
+			$t->{SNG_ID};
+		} @{ $result->{results}->{data} };
 		return $cb->() unless @trackTokens;
-		
+
 		$self->_getProviders( $cb, $context->{license}, $params->{quality}, \@trackTokens, \@trackIds );
 	}, {
 		method => 'radio.getUserRadio',
@@ -717,16 +725,25 @@ sub getTrackUrl {
 	
 	$self->gwCall( sub {
 		my ($result, $context) = @_;
-		my @trackTokens = map { $_->{TRACK_TOKEN} } @{ $result->{results}->{data} };
-		my @trackIds = map { $_->{SNG_ID} } @{ $result->{results}->{data} };
-#$log->error(Data::Dump::dump(\@trackTokens), Data::Dump::dump(\@trackIds));
+		# When a track has an empty RIGHTS hash it cannot be streamed (error 2002).
+		# Deezer then provides a FALLBACK entry with a licensed alternative version
+		# (different SNG_ID/TRACK_TOKEN) and populated RIGHTS - use that instead.
+		my @trackTokens = map {
+			my $t = ($_->{RIGHTS} && %{$_->{RIGHTS}}) ? $_ : ($_->{FALLBACK} || $_);
+			$t->{TRACK_TOKEN};
+		} @{ $result->{results}->{data} };
+		my @trackIds = map {
+			my $t = ($_->{RIGHTS} && %{$_->{RIGHTS}}) ? $_ : ($_->{FALLBACK} || $_);
+			$t->{SNG_ID};
+		} @{ $result->{results}->{data} };
+		main::INFOLOG && $log->is_info && $log->info("Track IDs after fallback resolution: @trackIds");
 
 		return $cb->() unless @trackTokens;
 
 		$self->_getProviders( $cb, $context->{license}, $params->{quality}, \@trackTokens, \@trackIds );
-	}, { 
+	}, {
 		method => 'song.getListData',
-	}, { 
+	}, {
 		sng_ids => $ids }
 	);
 }
