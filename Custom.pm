@@ -469,6 +469,7 @@ sub _userQuery {
 		# very lenghty (Perl hash key order is undetermined).
 		$cacheKey = join(':', map {	$_ . $params->{$_} } sort grep { $_ !~ /^_/ } keys %$params );
 		$cacheKey .= join(':', map { $_ . $content->{$_} } sort keys %$content) if $content && %$content;
+		$cacheKey .= ':' . $self->userId if $self->userId;
 		$cacheKey = md5_hex($cacheKey);
 	}
 
