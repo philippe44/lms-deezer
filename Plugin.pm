@@ -284,7 +284,7 @@ sub handleFeed {
 	},{
 		name => cstring($client, 'PLUGIN_DEEZER_FLOW'),
 		image => 'plugins/Deezer/html/flow.png',
-		play => 'deezer://user/' . $userId . '/flow.dzr',
+		play => 'deezer://user.flow',
 		type => 'outline',
 		items => [{
 			name => cstring($client, 'PLUGIN_DEEZER_FLOW'),
@@ -311,13 +311,14 @@ sub handleFeed {
 			type => 'link',
 			url => sub {
 				my ($client, $cb) = @_;
-				my $flow = !$prefs->get($userId . ':flow');
-				$prefs->set($userId . ':flow', $flow);
+				my $currentUserId = getAPIHandler($client)->userId;
+				my $flow = !$prefs->get($currentUserId . ':flow');
+				$prefs->set($currentUserId . ':flow', $flow);
 				$cb->({ items => [{
 					type => 'text',
 					name => cstring($client, $flow ? 'PLUGIN_DEEZER_FLOW_DISCOVERY' : 'PLUGIN_DEEZER_FLOW_DEFAULT'),
 				}] });
-			},	
+			},
 		},
 		],
 	},{
