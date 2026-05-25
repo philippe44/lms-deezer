@@ -613,7 +613,8 @@ sub getPlaylist {
 	} if $api->userId eq $params->{creatorId};
 
 	$api->playlistTracks(sub {
-		my $items = _renderTracks($_[0], $renderArgs);
+		my $tracks = [ reverse @{ $_[0] || [] } ];
+		my $items = _renderTracks($tracks, $renderArgs);
 		$cb->( { items => $items } );
 	}, $params->{id} );
 }
