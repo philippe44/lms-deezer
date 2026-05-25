@@ -603,20 +603,34 @@ sub getCompound {
 }
 
 sub getPlaylist {
-	my ( $client, $cb, $args, $params ) = @_;
+        my ( $client, $cb, $args, $params ) = @_;
 
-	my $api = getAPIHandler($client);
+        my $api = getAPIHandler($client);
 
-	# we'll only set playlist id we own it so that we can remove track later
-	my $renderArgs = {
-		playlistId => $params->{id}
-	} if $api->userId eq $params->{creatorId};
+        my $renderArgs = { playlistId => $params->{id} } if $api->userId eq $params->{creatorId};
 
-	$api->playlistTracks(sub {
-		my $tracks = [ reverse @{ $_[0] || [] } ];
-		my $items = _renderTracks($tracks, $renderArgs);
-		$cb->( { items => $items } );
-	}, $params->{id} );
+        my $reverse = $params->{reverse} ? 1 : 0;
+
+        $api->playlistTracks(sub {
+                my $tracks = $_[0] || [];
+
+                $tracks = [ reverse @$tracks ] if $reverse;
+
+                my $items = _renderTracks($tracks, $renderArgs);
+
+                unshift @$items, {
+                        name => $reverse ? 'Show original order' : 'Show newest first',
+                        type => 'link',
+                        url => \&getPlaylist,
+                        passthrough => [{
+                                id => $params->{id},
+                                creatorId => $params->{creatorId},
+                                reverse => $reverse ? 0 : 1,
+                        }],
+                };
+
+                $cb->( { items => $items } );
+        }, $params->{id} );
 }
 
 sub getPodcasts {
