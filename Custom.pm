@@ -449,7 +449,7 @@ sub liveStream {
 		my $urls = $result->{results}->{LIVESTREAM_URLS}->{data} if $result->{results}->{LIVESTREAM_URLS};
 		$cb->($urls);
 	}, {
-		method => method => 'livestream.getData',
+		method => 'livestream.getData',
 	}, {
 		livestream_id => $id,
 		supported_codecs => ['mp3', 'aac'],
