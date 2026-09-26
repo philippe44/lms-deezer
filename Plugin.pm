@@ -614,28 +614,25 @@ sub getPlaylist {
 	} if $api->userId eq $params->{creatorId};
 
 	$api->playlistTracks(sub {
+		my $tracks = $_[0] || [];
+		$tracks = [ reverse @$tracks ] if $params->{reverse};
+		my $items = _renderTracks($tracks, $renderArgs);
 
-        $api->playlistTracks(sub {
-            my $tracks = $_[0] || [];
-            $tracks = [ reverse @$tracks ] if $params->{reverse};
-            my $items = _renderTracks($tracks, $renderArgs);
-
-            unshift @$items, {
-				name => $params->{reverse} ? 'cstring($client, 'PLUGIN_DEEZER_DEFAULT_ORDER') : 'cstring($client, 'PLUGIN_DEEZER_NEWEST_ORDER'),
-                type => 'link',
-                url => \&getPlaylist,
-                passthrough => [{
-                    id => $params->{id},
-                    creatorId => $params->{creatorId},
-                    reverse => !$params->{reverse},
-                }],
-            };
-
-            $cb->( { items => $items } );
-			
-        }, $params->{id} );
+		unshift @$items, {
+			name => cstring($client, $params->{reverse}
+				? 'PLUGIN_DEEZER_DEFAULT_ORDER' 
+				: 'PLUGIN_DEEZER_NEWEST_ORDER'),
+			type => 'link',
+			url => \&getPlaylist,
+			passthrough => [{
+				id => $params->{id},
+				creatorId => $params->{creatorId},
+				reverse => !$params->{reverse},
+			}],
+		};
 
 		$cb->( { items => $items } );
+
 	}, $params->{id} );
 }
 
