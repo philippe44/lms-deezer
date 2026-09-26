@@ -482,6 +482,18 @@ PLUGIN_DEEZER_EPISODES
 	FR	Épisodes
 	HU	Epizódok
 	UA	Епізоди
+	
+PLUGIN_DEEZER_DEFAULT_ORDER
+	EN	Default order
+	FR	Ordre par défaut
+
+PLUGIN_DEEZER_NEWEST_ORDER
+	EN	Newest first
+	FR	Plus recentes d'abord
+	
+PLUGIN_DEEZER_FLOW_TOGGLE
+	EN	Toggle flow mode
+	FR	Bascule le mode flow
 
 PLUGIN_DEEZER_FLOW_DEFAULT
 	DA	Favoritter flow modus

@@ -306,11 +306,12 @@ sub handleFeed {
 			url => \&getFlow,
 			passthrough => [{ mode => 'moods' }],
 		},{
-			name => cstring($client, $prefs->get($userId . ':flow') ? 'PLUGIN_DEEZER_FLOW_DISCOVERY' : 'PLUGIN_DEEZER_FLOW_DEFAULT'),
+			name => cstring($client, 'PLUGIN_DEEZER_FLOW_TOGGLE'),
 			image => 'plugins/Deezer/html/settings.png',
 			type => 'link',
 			url => sub {
 				my ($client, $cb) = @_;
+				my $userId = getAPIHandler($client)->userId;
 				my $flow = !$prefs->get($userId . ':flow');
 				$prefs->set($userId . ':flow', $flow);
 				$cb->({ items => [{
@@ -613,7 +614,27 @@ sub getPlaylist {
 	} if $api->userId eq $params->{creatorId};
 
 	$api->playlistTracks(sub {
-		my $items = _renderTracks($_[0], $renderArgs);
+
+        $api->playlistTracks(sub {
+            my $tracks = $_[0] || [];
+            $tracks = [ reverse @$tracks ] if $params->{reverse};
+            my $items = _renderTracks($tracks, $renderArgs);
+
+            unshift @$items, {
+				name => $params->{reverse} ? 'cstring($client, 'PLUGIN_DEEZER_DEFAULT_ORDER') : 'cstring($client, 'PLUGIN_DEEZER_NEWEST_ORDER'),
+                type => 'link',
+                url => \&getPlaylist,
+                passthrough => [{
+                    id => $params->{id},
+                    creatorId => $params->{creatorId},
+                    reverse => !$params->{reverse},
+                }],
+            };
+
+            $cb->( { items => $items } );
+			
+        }, $params->{id} );
+
 		$cb->( { items => $items } );
 	}, $params->{id} );
 }
