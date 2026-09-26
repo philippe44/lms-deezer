@@ -722,17 +722,13 @@ sub getTrackUrl {
 	
 	$self->gwCall( sub {
 		my ($result, $context) = @_;
-		# When a track has an empty RIGHTS hash it cannot be streamed (error 2002).
-		# Deezer then provides a FALLBACK entry with a licensed alternative version
-		# (different SNG_ID/TRACK_TOKEN) and populated RIGHTS - use that instead.
-		my @trackTokens = map {
-			my $t = ($_->{RIGHTS} && %{$_->{RIGHTS}}) ? $_ : ($_->{FALLBACK} || $_);
-			$t->{TRACK_TOKEN};
-		} @{ $result->{results}->{data} };
-		my @trackIds = map {
-			my $t = ($_->{RIGHTS} && %{$_->{RIGHTS}}) ? $_ : ($_->{FALLBACK} || $_);
-			$t->{SNG_ID};
-		} @{ $result->{results}->{data} };
+		my (@trackTokens, @trackIds);
+
+		foreach (@{ $result->{results}->{data} }) {
+    		my $track = ($_->{RIGHTS} && %{$_->{RIGHTS}}) ? $_ : ($_->{FALLBACK} || $_);
+		    push @trackTokens, $track->{TRACK_TOKEN};
+    		push @trackIds,    $track->{SNG_ID};
+		}
 		main::INFOLOG && $log->is_info && $log->info("Track IDs after fallback resolution: @trackIds");
 
 		return $cb->() unless @trackTokens;
