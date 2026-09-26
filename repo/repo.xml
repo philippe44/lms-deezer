@@ -1,7 +1,7 @@
 <?xml version='1.0' standalone='yes'?>
 <extensions>
   <plugins>
-    <plugin version="3.2.1" maxTarget="*" name="Deezer" minTarget="8.3">
+    <plugin version="3.3.0" maxTarget="*" name="Deezer" minTarget="8.3">
       <creator>philippe_44, Michael Herger</creator>
       <category>musicservices</category>
       <title lang="EN">Deezer local</title>

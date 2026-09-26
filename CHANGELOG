@@ -1,0 +1,4 @@
+3.3.0
+ - fix wrong user id in soem menus when changing user id (cahce issue)
+ - add option to reverse track order
+ - fix typo in livestream
