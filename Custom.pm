@@ -449,11 +449,6 @@ sub liveStream {
 		my $urls = $result->{results}->{LIVESTREAM_URLS}->{data} if $result->{results}->{LIVESTREAM_URLS};
 		$cb->($urls);
 	}, {
-		# Fix (issue #54): the previous `method => method => 'livestream.getData'`
-		# was a typo. Perl's fat-comma auto-quotes the left side, so that expression
-		# produced { method => 'method', 'livestream.getData' => undef }, causing
-		# the GW API to be called with method name "method" and returning
-		# "Method unknown: method".
 		method => 'livestream.getData',
 	}, {
 		livestream_id => $id,
