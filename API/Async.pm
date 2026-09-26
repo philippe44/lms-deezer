@@ -235,11 +235,16 @@ sub flowTracks {
 	
 	$self->gwCall( sub {
 		my ($result, $context) = @_;
-		my @trackTokens = map { $_->{TRACK_TOKEN} } @{ $result->{results}->{data} };
-		my @trackIds = map { $_->{SNG_ID} } @{ $result->{results}->{data} };
-#$log->error(Data::Dump::dump(\@trackTokens), Data::Dump::dump(\@trackIds));
-		return $cb->() unless @trackTokens;
+		my (@trackTokens, @trackIds);
+
+		foreach (@{ $result->{results}->{data} }) {
+    		my $track = ($_->{RIGHTS} && %{$_->{RIGHTS}}) ? $_ : ($_->{FALLBACK} || $_);
+		    push @trackTokens, $track->{TRACK_TOKEN};
+    		push @trackIds,    $track->{SNG_ID};
+		}
 		
+		return $cb->() unless @trackTokens;
+
 		$self->_getProviders( $cb, $context->{license}, $params->{quality}, \@trackTokens, \@trackIds );
 	}, {
 		method => 'radio.getUserRadio',
@@ -717,16 +722,21 @@ sub getTrackUrl {
 	
 	$self->gwCall( sub {
 		my ($result, $context) = @_;
-		my @trackTokens = map { $_->{TRACK_TOKEN} } @{ $result->{results}->{data} };
-		my @trackIds = map { $_->{SNG_ID} } @{ $result->{results}->{data} };
-#$log->error(Data::Dump::dump(\@trackTokens), Data::Dump::dump(\@trackIds));
+		my (@trackTokens, @trackIds);
+
+		foreach (@{ $result->{results}->{data} }) {
+    		my $track = ($_->{RIGHTS} && %{$_->{RIGHTS}}) ? $_ : ($_->{FALLBACK} || $_);
+		    push @trackTokens, $track->{TRACK_TOKEN};
+    		push @trackIds,    $track->{SNG_ID};
+		}
+		main::INFOLOG && $log->is_info && $log->info("Track IDs after fallback resolution: @trackIds");
 
 		return $cb->() unless @trackTokens;
 
 		$self->_getProviders( $cb, $context->{license}, $params->{quality}, \@trackTokens, \@trackIds );
-	}, { 
+	}, {
 		method => 'song.getListData',
-	}, { 
+	}, {
 		sng_ids => $ids }
 	);
 }
