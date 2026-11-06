@@ -443,23 +443,137 @@ sub playlistTracks {
 	$self->_get("/playlist/$id/tracks", sub {
 		my $result = shift;
 		my $items = [];
+		my %unreadable;
 
 		if ($result) {
-			$items = Plugins::Deezer::API->cacheTrackMetadata([ grep {
-				($_->{type} && $_->{type} eq 'track' && $_->{readable}) ||
+			my @tracks = grep {
 				# allow user-uploaded tracks (identified by negative IDs)
-				(defined $_->{id} && $_->{id} < 0)
-			} @{$result->{data} || []} ]);
+				(defined $_->{id} && $_->{id} < 0) || ($_->{type} && $_->{type} eq 'track')
+			} @{$result->{data} || []};
+
+			# tracks flagged as not readable are only kept if Deezer can play them (see below)
+			$unreadable{$_->{id}} = 1 foreach grep {
+				!$_->{readable} && !(defined $_->{id} && $_->{id} < 0)
+			} @tracks;
+
+			$items = Plugins::Deezer::API->cacheTrackMetadata(\@tracks);
 
 			$cache->remove($cacheKey) if $refresh;
 		}
 
-		$cb->($items);
+		$self->_keepPlayableTracks($cb, $items, \%unreadable);
 	},{
 		_ttl => DYNAMIC_TTL,
 		_refresh => $refresh,
 		limit => MAX_LIMIT,
 	});
+}
+
+# Tracks flagged 'readable: false' are kept only if Deezer can play them, i.e. if song.getListData
+# returns RIGHTS or a FALLBACK (which getTrackUrl uses at playback). The same answer gives the cover:
+# for these tracks the public API returns an empty or dead image. A playable track is remembered
+# together with its cover. 'Not playable' is not remembered as it might be temporary.
+sub _keepPlayableTracks {
+	my ($self, $cb, $items, $unreadable) = @_;
+
+	my $emptyImage = 'd41d8cd98f00b204e9800998ecf8427e';
+	$items ||= [];
+	$unreadable ||= {};
+
+	my (%playable, %covers, @unknown, %seen);
+
+	foreach my $item (@$items) {
+		my $trackId = $item->{id};
+		next unless $trackId && $unreadable->{$trackId} && !$seen{$trackId}++;
+
+		my $known = $cache->get('deezer_canplay_' . $trackId);
+
+		if ($known && $known =~ /^https?:/) {
+			$playable{$trackId} = 1;
+			$covers{$trackId} = $known;
+		}
+		else {
+			push @unknown, $trackId;
+		}
+	}
+
+	main::INFOLOG && $log->is_info && $log->info(sprintf(
+		"Playlist has %d unreadable track(s): %d known as playable, %d to look up",
+		scalar(keys %$unreadable), scalar(keys %playable), scalar(@unknown)));
+
+	my @chunks;
+	push @chunks, [ splice(@unknown, 0, PAGE_SIZE) ] while @unknown;
+
+	my $finish = sub {
+		# an unreadable track stays only if it is known to be playable
+		my @kept = grep {
+			my $trackId = $_->{id};
+			!($trackId && $unreadable->{$trackId}) || $playable{$trackId};
+		} @$items;
+
+		foreach my $item (@kept) {
+			my $url = $covers{$item->{id}} or next;
+			next if ($item->{icon} || '') eq $url;
+
+			$item->{icon} = $item->{cover} = $url;
+			$cache->set('deezer_meta_' . $item->{id}, $item, '90days');
+		}
+
+		return $cb->(\@kept);
+	};
+
+	my $next;
+	$next = sub {
+		my $ids = shift @chunks;
+
+		if (!$ids) {
+			undef $next;
+			return $finish->();
+		}
+
+		$self->gwCall( sub {
+			my ($result) = @_;
+			my $valid = $result && ref $result->{results} eq 'HASH';
+			my $records = ($valid && $result->{results}->{data}) || [];
+			my $answered = 0;
+
+			foreach my $rec (@$records) {
+				my $origId = $rec->{SNG_ID} or next;
+				$answered++;
+
+				my $fb = ref $rec->{FALLBACK} eq 'HASH' ? $rec->{FALLBACK} : {};
+				my $hasRights = (ref $rec->{RIGHTS} eq 'HASH' && %{$rec->{RIGHTS}}) ? 1 : 0;
+				my $canPlay = ($hasRights || %$fb) ? 1 : 0;
+
+				$playable{$origId} = $canPlay;
+
+				# prefer the replacement recording's cover, else the track's own
+				my $pic = $fb->{ALB_PICTURE};
+				$pic = $rec->{ALB_PICTURE} if !$pic || $pic eq $emptyImage;
+
+				if ($canPlay && $pic && $pic ne $emptyImage) {
+					$covers{$origId} = Plugins::Deezer::API->getImageUrl({ md5_image => $pic }, undef, 'track');
+					$cache->set('deezer_canplay_' . $origId, $covers{$origId}, 30 * DEFAULT_TTL);
+				}
+
+				main::DEBUGLOG && $log->is_debug && $log->debug(sprintf(
+					"Track %s: %s, rights=%d, cover=%s",
+					$origId, ($canPlay ? 'playable' : 'not playable, hidden'), $hasRights, $covers{$origId} || 'none'));
+			}
+
+			main::INFOLOG && $log->is_info && $log->info(
+				$valid ? "Deezer answered for $answered of " . scalar(@$ids) . " unreadable tracks"
+				       : "Lookup of unreadable tracks failed, they stay hidden");
+
+			$next->();
+		}, {
+			method => 'song.getListData',
+		}, {
+			sng_ids => $ids,
+		} );
+	};
+
+	$next->();
 }
 
 # User collections can be large - but have a known last updated timestamp.
