@@ -776,10 +776,10 @@ sub _getProviders {
 		format => 'MP3_320',
 	} if ($quality ne 'LOW');
 
-	unshift @$formats, {
-		cipher => 'BF_CBC_STRIPE',
-		format => 'FLAC',
-	} if ($quality eq 'LOSSLESS');
+	unshift @$formats,
+		{ cipher => 'BF_CBC_STRIPE', format => 'FLAC_24' },
+		{ cipher => 'BF_CBC_STRIPE', format => 'FLAC' } 
+	if ($quality eq 'LOSSLESS');
 
 	my $content = encode_json( {
 		track_tokens => $trackTokens,
