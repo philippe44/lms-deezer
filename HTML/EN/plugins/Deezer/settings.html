@@ -55,7 +55,7 @@
 		<!-- </datalist> -->
 		<!-- </input> -->
 		<select class="stdedit" name="pref_quality" id="quality">		
-		[% FOREACH entry IN [ ['MP3 128Kbps','LOW'], ['MP3 320Kbps', 'HIGH'], ['CD (FLAC)','LOSSLESS'], ['Hi-Res (FLAC 24-bit)','HIRES'] ] %]		
+		[% FOREACH entry IN [ ['MP3 128Kbps','LOW'], ['MP3 320Kbps', 'HIGH'], ['CD (FLAC)','LOSSLESS'], ['Hi-Res (FLAC 24-bit)','HIRES'] ] %]
 			<option [% IF entry.1 == prefs.pref_quality %]selected[% END %] value="[% entry.1 %]">[% entry.0 %]</option>
 		[% END %]
 		</select>
