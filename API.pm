@@ -42,7 +42,8 @@ use constant IMAGE_SIZES => {
 use constant SOUND_QUALITY => {
 	LOW => 'mp3',
 	HIGH => 'mp3',
-	LOSSLESS => 'flc'
+	LOSSLESS => 'flc',
+	HIRES => 'flc'
 };
 
 my $cache = Slim::Utils::Cache->new;
