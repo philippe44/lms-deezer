@@ -777,7 +777,7 @@ sub _getProviders {
 	} if ($quality ne 'LOW');
 
 	unshift @$formats, {
-    	cipher => 'BF_CBC_STRIPE',
+		cipher => 'BF_CBC_STRIPE',
 		format => 'FLAC',
 	} if ($quality eq 'LOSSLESS');
 	
