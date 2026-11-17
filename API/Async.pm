@@ -511,12 +511,14 @@ sub getFavorites {
 				}
 			}
 
-			$cache->set($cacheKey, {
-				items => $items,
-				checksum => $result->{checksum},
-				timestamp => time(),
-				total => $result->{total},
-			}, '1M') if $items;
+			if ($items && $result->{data}) {
+				$cache->set($cacheKey, {
+					items => $items,
+					checksum => $result->{checksum},
+					timestamp => time(),
+					total => $result->{total},
+				}, '1M');
+			}
 
 			$cb->($items);
 		},{
