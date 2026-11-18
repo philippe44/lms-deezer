@@ -785,6 +785,11 @@ sub _getProviders {
 		cipher => 'BF_CBC_STRIPE',
 		format => 'FLAC',
 	} if ($quality eq 'LOSSLESS');
+	
+	unshift @$formats,
+		{ cipher => 'BF_CBC_STRIPE', format => 'FLAC_24' },
+		{ cipher => 'BF_CBC_STRIPE', format => 'FLAC' } 
+	if ($quality eq 'HIRES');
 
 	my $content = encode_json( {
 		track_tokens => $trackTokens,
