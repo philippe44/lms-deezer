@@ -1,3 +1,6 @@
+3.4.0
+ - add FLAC_24 in hires (credits @regounet)
+
 3.3.0
  - fix wrong user id in soem menus when changing user id (cahce issue)
  - add option to reverse track order
