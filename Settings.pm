@@ -20,7 +20,7 @@ sub name { Slim::Web::HTTP::CSRF->protectName('PLUGIN_DEEZER_NAME') }
 
 sub page { Slim::Web::HTTP::CSRF->protectURI('plugins/Deezer/settings.html') }
 
-sub prefs { return ($prefs, qw(quality liveformat liverate unfold_collection)) }
+sub prefs { return ($prefs, qw(quality liveformat liverate unfold_collection check_track_rights rights_cache_ttl)) }
 
 sub handler {
 	my ($class, $client, $params, $callback, @args) = @_;

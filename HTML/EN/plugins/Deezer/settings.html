@@ -49,6 +49,18 @@
 		<input name="pref_unfold_collection" type="checkbox" [% IF prefs.pref_unfold_collection %] checked [% END %]>
 	[% END %]
 
+	[% WRAPPER setting title="PLUGIN_DEEZER_CHECK_RIGHTS" desc="PLUGIN_DEEZER_CHECK_RIGHTS_DESC" %]
+		<input name="pref_check_track_rights" type="checkbox" [% IF prefs.pref_check_track_rights %] checked [% END %]>
+	[% END %]
+
+	[% WRAPPER setting title="PLUGIN_DEEZER_RIGHTS_CACHE_TTL" desc="PLUGIN_DEEZER_RIGHTS_CACHE_TTL_DESC" %]
+		<select class="stdedit" name="pref_rights_cache_ttl">
+		[% FOREACH entry IN [['1h','1'],['6h','6'],['12h','12'],['24h','24'],['48h','48'],['7 Tage','168']] %]
+			<option [% IF entry.1 == prefs.pref_rights_cache_ttl %]selected[% END %] value="[% entry.1 %]">[% entry.0 %]</option>
+		[% END %]
+		</select>
+	[% END %]
+
 	[% WRAPPER setting title="PLUGIN_DEEZER_QUALITY" desc="PLUGIN_DEEZER_QUALITY_DESC" %]
 		<!-- <input list="rates" name="pref_quality" id="quality"> -->
 		<!-- <datalist id="rates"> -->
