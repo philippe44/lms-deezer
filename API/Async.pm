@@ -48,6 +48,21 @@ my $tzOffset = tz_local_offset();
 
 use constant PAGE_SIZE => 50;
 
+# Credentials must never reach the log: mask ARL-shaped strings (192+ hex chars) and the values of
+# session keys, wherever they appear (dumped hash, query string, Cookie header, JSON string inside a
+# dump, where Data::Dump escapes the quotes as \").
+my $SECRET_KEYS = qr/arl|sid|SESSION_ID|license_token|USER_TOKEN|PLAYER_TOKEN|checkForm|api_token|access_token/i;
+my $QUOTE = qr/(?:\\?["'])/;
+
+sub _redact {
+	my $text = shift // '';
+	$text =~ s/\b[0-9a-f]{192,}\b/<redacted>/gi;
+	$text =~ s/($QUOTE?\b(?:$SECRET_KEYS)\b$QUOTE?\s*(?:=>|=|:)\s*$QUOTE?)[^\\"'&;,\s}]+/$1<redacted>/g;
+	return $text;
+}
+
+sub _dump { _redact(Data::Dump::dump(@_)) }
+
 sub init {
 	my $accounts = $prefs->get("accounts");
 	refreshArl($_) foreach (keys %$accounts);
@@ -634,7 +649,7 @@ sub updateFavorite {
 		$method = "song.$action" . 'Favorites';			
 	}
 	
-	main::INFOLOG && $log->is_info && $log->info("updating favorites ($action) with $method", Data::Dump::dump($content));	
+	main::INFOLOG && $log->is_info && $log->info("updating favorites ($action) with $method", _dump($content));	
 	$self->gwCall( $cb, { 
 		method => $method,
 	}, $content );
@@ -806,7 +821,7 @@ sub _getProviders {
 			my $tracks = [];
 
 			$@ && $log->error($@);
-			$log->debug(Data::Dump::dump($result)) if $@ || (main::DEBUGLOG && $log->is_debug);
+			$log->debug(_dump($result)) if $@ || (main::DEBUGLOG && $log->is_debug);
 
 			# stitch back the track ids whch should be in same array order...
 			foreach my $i (0...$#{$result->{data}} ) {
@@ -818,15 +833,15 @@ sub _getProviders {
 					urls => [ map { $_->{url} } @{$media->[0]->{sources}} ],
 				};
 			}
-#$log->error(Data::Dump::dump($tracks));
+#$log->error(_dump($tracks));
 
-			$log->warn("can't get tracks: ", Data::Dump::dump($result)) unless scalar @$tracks;
+			$log->warn("can't get tracks: ", _dump($result)) unless scalar @$tracks;
 			$cb->($tracks);
 		},
 		sub {
 			my ($http, $error) = @_;
 			$log->warn("Error: $error");
-			main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($http));
+			main::DEBUGLOG && $log->is_debug && $log->debug(_dump($http));
 			$cb->();
 		},
 	)->post(UURL, 'Content-Type' => 'application/json', $content);
@@ -846,7 +861,7 @@ sub gwCall {
 		# I really don't know when these expire, but certainly not with that timestamp
 		$context->{expiration} = time() + 3600*4;
 				
-		main::INFOLOG && $log->is_info && $log->info("got a new session for ARL $context->{arl}");
+		main::INFOLOG && $log->is_info && $log->info("got a new session for user ", $self->userId);
 		$self->gwCall($cb, $args, $content);
 	}, {
 		method => 'deezer.getUserData',
@@ -927,7 +942,7 @@ sub _ajax {
 	} );
 
 	my $method = $content ? 'post' : 'get';
-	main::INFOLOG && $log->is_info && $log->info(uc($method) . " ?$query ", $content ? Data::Dump::dump($content) : '');
+	main::INFOLOG && $log->is_info && $log->info(_redact(uc($method) . " ?$query "), $content ? _dump($content) : '');
 
 	if ( $cacheKey && (my $cached = $cache->get($cacheKey)) ) {
 		main::INFOLOG && $log->is_info && $log->info("returning from cache $cacheKey");
@@ -939,7 +954,7 @@ sub _ajax {
 			my $result = eval { from_json($_[0]->content) };
 
 			$@ && $log->error($@);
-			$log->debug(Data::Dump::dump($result)) if $@ || (main::DEBUGLOG && $log->is_debug);
+			$log->debug(_dump($result)) if $@ || (main::DEBUGLOG && $log->is_debug);
 
 			$cache->set($cacheKey, $result, $ttl) if $cacheKey;
 			$cb->($result);
@@ -947,7 +962,7 @@ sub _ajax {
 		sub {
 			my ($http, $error) = @_;
 			$log->warn("Error: $error");
-			main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($http));
+			main::DEBUGLOG && $log->is_debug && $log->debug(_dump($http));
 			$cb->();
 		},
 	)->$method(GURL . "?$query", %headers, $content);
@@ -1006,7 +1021,7 @@ sub _gwPost {
 			my $result = eval { from_json(shift->content) };
 
 			$@ && $log->error($@);
-			$log->debug(Data::Dump::dump($result)) if $@ || (main::DEBUGLOG && $log->is_debug);
+			$log->debug(_dump($result)) if $@ || (main::DEBUGLOG && $log->is_debug);
 
 			$cache->set($cacheKey, $result, $ttl) if $cacheKey;
 			$cb->($result);
@@ -1017,7 +1032,7 @@ sub _gwPost {
 			my $result = eval { from_json($response->content) };
 
 			$@ && $log->error($@);
-			main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($result));
+			main::DEBUGLOG && $log->is_debug && $log->debug(_dump($result));
 
 			# note that when querying compound types like 'chart', there is no 'total' as the result is
 			# a hash with keys for tracks, artists, albums and podcasts *and* the {data] key is a sub-key
@@ -1077,7 +1092,7 @@ sub _gwPost {
 		sub {
 			my ($http, $error) = @_;
 			$log->warn("Error: $error");
-			main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($http));
+			main::DEBUGLOG && $log->is_debug && $log->debug(_dump($http));
 			$cb->();
 		},
 	)->post(GURL . "?$query", %headers, $content);
@@ -1119,7 +1134,7 @@ sub _get {
 
 	if (!$noCache && !$refresh && (my $cached = $cache->get($cacheKey))) {
 		main::INFOLOG && $log->is_info && $log->info("Returning cached data for $url?$trace");
-		main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($cached));
+		main::DEBUGLOG && $log->is_debug && $log->debug(_dump($cached));
 
 		return $cb->($cached);
 	}
@@ -1133,7 +1148,7 @@ sub _get {
 			my $result = eval { from_json($response->content) };
 
 			$@ && $log->error($@);
-			main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($result));
+			main::DEBUGLOG && $log->is_debug && $log->debug(_dump($result));
 
 			# note that when querying compound types like 'chart', there is no 'total' as the result is
 			# a hash with keys for tracks, artists, albums and podcasts *and* the {data] key is a sub-key
@@ -1194,7 +1209,7 @@ sub _get {
 			my ($http, $error) = @_;
 
 			$log->warn("Error: $error");
-			main::DEBUGLOG && $log->is_debug && $log->debug(Data::Dump::dump($http));
+			main::DEBUGLOG && $log->is_debug && $log->debug(_dump($http));
 
 			$cb->();
 		},

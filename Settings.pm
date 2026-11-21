@@ -27,7 +27,7 @@ sub handler {
 
 	if ($params->{addAccount}) {
 		my $arl = $params->{arl};
-		main::INFOLOG && $log->is_info && $log->info("Adding/Refreshing account with arl $arl");
+		main::INFOLOG && $log->is_info && $log->info("Adding/Refreshing account from ARL");
 		
 		Plugins::Deezer::API::Async::getUserFromARL( sub {	
 			my $user = shift;
@@ -47,7 +47,7 @@ sub handler {
 				Plugins::Deezer::API::Async::refreshArl($userId);
 			} else {
 				$params->{'warning'} = Slim::Utils::Strings::string('PLUGIN_DEEZER_AUTH_FAILED');
-				$log->error("Unable to add /refresh user with ARL $arl");
+				$log->error("Unable to add /refresh user from ARL");
 			}
 			
 			my $body = $class->SUPER::handler( $client, $params );
