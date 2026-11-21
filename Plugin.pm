@@ -513,7 +513,11 @@ sub getAlbum {
 	my ( $client, $cb, $args, $params ) = @_;
 
 	getAPIHandler($client)->albumTracks(sub {
-		my $items = _renderTracks(shift);
+		my ($tracks, $albumTracks) = @_;
+		my $items = _renderTracks($tracks);
+		# the album has tracks, but none is playable (not a failed request)
+		$items = [{ name => cstring($client, 'PLUGIN_DEEZER_NO_PLAYABLE_TRACKS'), type => 'textarea' }]
+			if !@$items && $albumTracks;
 		$cb->( { items => $items } );
 	}, $params->{id} );
 }

@@ -289,10 +289,15 @@ sub albumTracks {
 		$self->_get("/album/$id/tracks", sub {
 			my $tracks = shift;
 			$tracks = $tracks->{data} if $tracks;
-			# only missing data in album/tracks is the album itself...
-			$tracks = Plugins::Deezer::API->cacheTrackMetadata( $tracks, { album => $album } ) if $tracks;
+			return $cb->([]) unless $tracks;
 
-			$cb->($tracks || []);
+			# list only Playable tracks; without a gw answer keep every track, as album
+			# listings never filtered on the readable flag. The album's own track count
+			# tells an album without Playable tracks from a failed request.
+			$self->_playableTracks( sub {
+				# only missing data in album/tracks is the album itself...
+				$cb->( Plugins::Deezer::API->cacheTrackMetadata( $_[0], { album => $album } ), scalar @$tracks );
+			}, $tracks, sub { 1 } );
 		}, {
 			limit => MAX_LIMIT,
 		} );
@@ -473,24 +478,25 @@ sub playlistTracks {
 # track in the queue stops playback: when it fails as the next track, LMS waits for it to
 # start and stops at the end of the current one. So decide like getTrackUrl does: keep a
 # track if it has RIGHTS or a FALLBACK. Tracks the gw API does not answer for (or all of
-# them, without an ARL) keep the readable flag as before.
+# them, without an ARL) are decided by $keepUnanswered, which defaults to the readable flag.
 sub _playableTracks {
-	my ($self, $cb, $tracks) = @_;
+	my ($self, $cb, $tracks, $keepUnanswered) = @_;
+	$keepUnanswered ||= sub { $_[0]->{readable} };
 
-	my $byReadable = sub {
+	my $keep = sub {
 		my $filter = shift || {};
 		[ grep {
-			($_->{id} < 0) || ( exists $filter->{$_->{id}} ? $filter->{$_->{id}} : $_->{readable} )
+			($_->{id} < 0) || ( exists $filter->{$_->{id}} ? $filter->{$_->{id}} : $keepUnanswered->($_) )
 		} @$tracks ];
 	};
 
 	my @ids = map { $_->{id} } grep { $_->{id} > 0 } @$tracks;
 	my $context = $contexts{$self->userId};
-	return $cb->($byReadable->()) unless @ids && $context && $context->{arl};
+	return $cb->($keep->()) unless @ids && $context && $context->{arl};
 
 	$self->gwCall( sub {
 		my $data = $_[0] && ref $_[0]->{results} eq 'HASH' && $_[0]->{results}->{data};
-		return $cb->($byReadable->()) unless $data && ref $data eq 'ARRAY';
+		return $cb->($keep->()) unless $data && ref $data eq 'ARRAY';
 
 		my %playable = map {
 			$_->{SNG_ID} => ( ($_->{RIGHTS} && %{$_->{RIGHTS}}) || $_->{FALLBACK} ) ? 1 : 0
@@ -504,7 +510,7 @@ sub _playableTracks {
 			!($_->{RIGHTS} && %{$_->{RIGHTS}}) && ref $_->{FALLBACK} && $_->{FALLBACK}->{ALB_PICTURE}
 		} @$data;
 
-		my $kept = $byReadable->(\%playable);
+		my $kept = $keep->(\%playable);
 
 		foreach (@$kept) {
 			my $cover = $fallbackCover{$_->{id}} || next;
