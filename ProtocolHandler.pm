@@ -198,7 +198,13 @@ sub explodePlaylist {
 			$method = \&Plugins::Deezer::Plugin::getPodcastEpisodes;
 		}
 
-		$method->($client, $cb, { }, { id => $id });
+		# queue only what can be played: these menus also hold links (e.g. a playlist's sort
+		# order) or text items, which LMS would otherwise add to the queue as broken entries
+		$method->($client, sub {
+			my $result = shift;
+			$result->{items} = [ grep { $_->{play} } @{$result->{items}} ] if ref $result eq 'HASH' && ref $result->{items};
+			$cb->($result);
+		}, { }, { id => $id });
 		main::INFOLOG && $log->is_info && $log->info("Getting $url, type:$type, id:$id");
 	}
 	else {
