@@ -49,13 +49,15 @@ my $tzOffset = tz_local_offset();
 use constant PAGE_SIZE => 50;
 
 # Credentials must never reach the log: mask ARL-shaped strings (192+ hex chars) and the values of
-# session keys, wherever they appear (dumped hash, query string, Cookie header).
+# session keys, wherever they appear (dumped hash, query string, Cookie header, JSON string inside a
+# dump, where Data::Dump escapes the quotes as \").
 my $SECRET_KEYS = qr/arl|sid|SESSION_ID|license_token|USER_TOKEN|PLAYER_TOKEN|checkForm|api_token|access_token/i;
+my $QUOTE = qr/(?:\\?["'])/;
 
 sub _redact {
 	my $text = shift // '';
 	$text =~ s/\b[0-9a-f]{192,}\b/<redacted>/gi;
-	$text =~ s/(["']?\b(?:$SECRET_KEYS)\b["']?\s*(?:=>|=|:)\s*["']?)[^"'&;,\s}]+/$1<redacted>/g;
+	$text =~ s/($QUOTE?\b(?:$SECRET_KEYS)\b$QUOTE?\s*(?:=>|=|:)\s*$QUOTE?)[^\\"'&;,\s}]+/$1<redacted>/g;
 	return $text;
 }
 
