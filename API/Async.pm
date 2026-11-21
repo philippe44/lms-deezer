@@ -496,7 +496,22 @@ sub _playableTracks {
 			$_->{SNG_ID} => ( ($_->{RIGHTS} && %{$_->{RIGHTS}}) || $_->{FALLBACK} ) ? 1 : 0
 		} @$data;
 
+		# a track that only plays via its FALLBACK shows the cover of the version that is
+		# actually played: its own image id is often empty or points to a removed image
+		my %fallbackCover = map {
+			$_->{SNG_ID} => $_->{FALLBACK}->{ALB_PICTURE}
+		} grep {
+			!($_->{RIGHTS} && %{$_->{RIGHTS}}) && ref $_->{FALLBACK} && $_->{FALLBACK}->{ALB_PICTURE}
+		} @$data;
+
 		my $kept = $byReadable->(\%playable);
+
+		foreach (@$kept) {
+			my $cover = $fallbackCover{$_->{id}} || next;
+			$_->{md5_image} = $cover;
+			# kept as long as the track metadata, so that refreshes of the original track (/track/{id}) keep it
+			$cache->set('deezer_fallback_cover_' . $_->{id}, $cover, '90days');
+		}
 		main::INFOLOG && $log->is_info && $log->info(sprintf("%d of %d tracks playable (rights or fallback), %d answered by gw",
 			scalar @$kept, scalar @$tracks, scalar keys %playable));
 

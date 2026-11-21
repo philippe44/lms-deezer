@@ -144,6 +144,10 @@ sub cacheTrackMetadata {
 	return [ map {
 		my $entry = $_;
 		my $oldMeta = $cache->get( 'deezer_meta_' . $entry->{id}) || {};
+		# a track that only plays via its FALLBACK keeps the fallback's cover (see Async::_playableTracks)
+		if ( my $fallbackCover = $cache->get('deezer_fallback_cover_' . $entry->{id}) ) {
+			$entry->{md5_image} = $fallbackCover;
+		}
 		my $icon = $class->getImageUrl($entry, 'usePlaceholder', 'track');
 
 		# consolidate metadata in case parsing of stream came first (huh?)
