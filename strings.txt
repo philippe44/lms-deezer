@@ -574,3 +574,7 @@ PLUGIN_DEEZER_UNFOLD_DESC
 	FR	Configure le déroulement du menu de votre collection
 	HU	Állítsa be a gyűjtemény menüjének összehajtási módját
 	UA	Встановіть режим згортання меню вашої колекції
+
+PLUGIN_DEEZER_NO_PLAYABLE_TRACKS
+	DE	Keine abspielbaren Titel verfügbar. Möglicherweise sind diese Titel in Ihrer Region oder mit Ihrem Abonnement nicht lizenziert.
+	EN	No playable tracks available. These tracks may not be licensed for your region or subscription.
