@@ -14,6 +14,8 @@ use constant BURL => 'https://api.deezer.com';
 use constant GURL => 'https://www.deezer.com/ajax/gw-light.php';
 use constant UURL => 'https://media.deezer.com/v1/get_url';
 use constant IURL => 'https://e-cdns-images.dzcdn.net/images';
+# Deezer's image id for "no image": the MD5 of an empty string
+use constant EMPTY_IMAGE => 'd41d8cd98f00b204e9800998ecf8427e';
 
 use constant DEFAULT_LIMIT => 100;
 use constant MAX_LIMIT => 2000;
@@ -83,7 +85,15 @@ sub getQuality {
 sub getImageUrl {
 	my ($class, $data, $usePlaceholder, $type) = @_;
 
-	if ( my $coverId = $data->{md5_image} || $data->{picture_big} || $data->{picture_medium} || $data->{picture} || (ref $data->{album} && $data->{album}->{cover}) ) {
+	# EMPTY_IMAGE is no image. Once one of the item's own image fields holds it, the others (e.g. the
+	# API's /image URL) lead to that same empty image. A track without an image of its own then gets
+	# its album's cover, unless the album has none either.
+	my $isEmpty = sub { index($_[0] || '', EMPTY_IMAGE) >= 0 };
+	my $ownImageEmpty = grep { $isEmpty->($_) } @$data{qw(md5_image picture_big picture_medium picture)};
+	my $albumCover = ref $data->{album} && !$isEmpty->($data->{album}->{md5_image}) && $data->{album}->{cover};
+	my $coverId = ($ownImageEmpty ? undef : $data->{md5_image} || $data->{picture_big} || $data->{picture_medium} || $data->{picture}) || $albumCover;
+
+	if ( $coverId ) {
 
 		return $data->{cover} = $coverId if $coverId =~ /^https?:/;
 
@@ -98,6 +108,10 @@ sub getImageUrl {
 		else {
 			delete $data->{cover};
 		}
+	}
+	# an item's own cover URL (e.g. an album's) leads to that same empty image
+	elsif ( $ownImageEmpty ) {
+		delete $data->{cover};
 	}
 
 	return $data->{cover} || (!main::SCANNER && $usePlaceholder && Plugins::Deezer::Plugin->_pluginDataFor('icon'));
