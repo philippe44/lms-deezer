@@ -449,6 +449,14 @@ sub playlistTracks {
 		my $result = shift;
 		my $items = [];
 
+		if (!$result || $result->{error} || !$result->{data}) {
+			return $self->gwCall( sub {
+				my $res = shift;
+				my $data = ($res && ref $res->{results} eq 'HASH') ? $res->{results}->{data} : undef;
+				$cb->( ref $data eq 'ARRAY' ? Plugins::Deezer::Custom::_cacheTrackMetadata(_gwArtists($data)) : [] );
+			}, { method => 'playlist.getSongs' }, { playlist_id => $id, nb => MAX_LIMIT, start => 0 } );
+		}
+
 		if ($result) {
 			$items = Plugins::Deezer::API->cacheTrackMetadata([ grep {
 				($_->{type} && $_->{type} eq 'track' && $_->{readable}) ||
@@ -484,14 +492,31 @@ sub getFavorites {
 	return $cb->() unless $type;
 
 	my $userId = $self->userId || return $cb->();
-	my $cacheKey = "deezer_favs_$type:$userId";
+	my $cacheKey = "deezer_favs_v2_$type:$userId";
 
 	# verify if that type has been updated and force refresh (don't confuse adding
 	# a playlist to favorites with changing the *content* of a playlist)
 	$refresh ||= $self->updatedFavorites($type);
 	$self->updatedFavorites($type, 0);
 
+	my $publicLookup;
 	my $lookupSub = sub {
+		my $timestamp = shift;
+
+		$self->_gwFavorites(sub {
+			my $items = shift;
+			return $publicLookup->($timestamp) unless ref $items eq 'ARRAY';
+			$cache->set($cacheKey, {
+				items => $items,
+				gw => 1,
+				timestamp => time(),
+				total => scalar @$items,
+			}, '1M');
+			$cb->($items);
+		}, $type);
+	};
+
+	$publicLookup = sub {
 		my $timestamp = shift;
 
 		# no cache, so we can use /me
@@ -511,12 +536,14 @@ sub getFavorites {
 				}
 			}
 
-			$cache->set($cacheKey, {
-				items => $items,
-				checksum => $result->{checksum},
-				timestamp => time(),
-				total => $result->{total},
-			}, '1M') if $items;
+			if ($items && $result->{data}) {
+				$cache->set($cacheKey, {
+					items => $items,
+					checksum => $result->{checksum},
+					timestamp => time(),
+					total => $result->{total},
+				}, '1M');
+			}
 
 			$cb->($items);
 		},{
@@ -526,6 +553,12 @@ sub getFavorites {
 	};
 
 	my $cached = $cache->get($cacheKey);
+
+	# from the logged-in API: no checksum to compare, so just look again when asked to refresh
+	if ($cached && ref $cached->{items} && $cached->{gw}) {
+		return $cb->($cached->{items}) unless $refresh && time() - $cached->{timestamp} > 60;
+		return $lookupSub->();
+	}
 
 	# use cached data unless the collection has changed
 	if ($cached && ref $cached->{items}) {
@@ -549,6 +582,69 @@ sub getFavorites {
 	else {
 		$lookupSub->();
 	}
+}
+
+# The user's favourites through the logged-in API (gw-light, the ARL's session), in the format of
+# api.deezer.com so the menus don't change. Calls back with an array ref, or nothing on failure.
+my %GW_TAB = ( playlists => 'playlists', albums => 'albums', artists => 'artists' );
+
+sub _gwFavorites {
+	my ($self, $cb, $type) = @_;
+	my $userId = $self->userId || return $cb->();
+
+	if ($type eq 'tracks') {
+		return $self->gwCall( sub {
+			my $res = shift;
+			my $data = ($res && ref $res->{results} eq 'HASH') ? $res->{results}->{data} : undef;
+			return $cb->() unless ref $data eq 'ARRAY';
+			$cb->( Plugins::Deezer::Custom::_cacheTrackMetadata(_gwArtists($data)) );
+		}, { method => 'favorite_song.getList' }, { user_id => $userId, nb => MAX_LIMIT, start => 0 } );
+	}
+
+	my $tab = $GW_TAB{$type} || return $cb->();
+	$self->gwCall( sub {
+		my $res = shift;
+		my $data = eval { $res->{results}->{TAB}->{$tab}->{data} };
+		return $cb->() unless ref $data eq 'ARRAY';
+		$cb->( [ map { _gwToApi($type, $_) } @$data ] );
+	}, { method => 'deezer.pageProfile' }, { user_id => $userId, tab => $tab, nb => MAX_LIMIT } );
+}
+
+# Some gw-light song lists name the artist only in ART_NAME, not in the ARTISTS list that
+# _cacheTrackMetadata reads: fill it in, or the songs show without their artist.
+sub _gwArtists {
+	my ($songs) = @_;
+	for my $s (@$songs) {
+		next unless ref $s eq 'HASH';
+		$s->{ARTISTS} = [ { ART_ID => $s->{ART_ID}, ART_NAME => $s->{ART_NAME} } ]
+			if $s->{ART_NAME} && !(ref $s->{ARTISTS} eq 'ARRAY' && @{$s->{ARTISTS}});
+	}
+	return $songs;
+}
+
+sub _gwToApi {
+	my ($type, $i) = @_;
+
+	if ($type eq 'playlists') {
+		return {
+			id => $i->{PLAYLIST_ID}, title => $i->{TITLE}, type => 'playlist',
+			md5_image => $i->{PLAYLIST_PICTURE}, picture_type => $i->{PICTURE_TYPE} || 'playlist',
+			nb_tracks => $i->{NB_SONG},
+			creator => { id => $i->{PARENT_USER_ID} },
+			user => { id => $i->{PARENT_USER_ID}, name => $i->{PARENT_USERNAME} },
+		};
+	}
+	if ($type eq 'albums') {
+		return {
+			id => $i->{ALB_ID}, title => $i->{ALB_TITLE}, type => 'album',
+			md5_image => $i->{ALB_PICTURE}, picture_type => 'cover',
+			artist => { id => $i->{ART_ID}, name => $i->{ART_NAME} },
+		};
+	}
+	return {
+		id => $i->{ART_ID}, name => $i->{ART_NAME}, type => 'artist',
+		md5_image => $i->{ART_PICTURE}, picture_type => 'artist',
+	};
 }
 
 sub getCollectionFingerprint {
